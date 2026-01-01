@@ -1,0 +1,110 @@
+.claims-page-wrapper {
+    min-height: 80vh;
+    padding: 60px 20px;
+    background-color: #f9f9f9;
+    display: flex;
+    justify-content: center;
+}
+
+.claims-container {
+    width: 100%;
+    max-width: 600px;
+    background: white;
+    padding: 40px;
+    border-radius: 16px;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.05);
+}
+
+.claims-header {
+    text-align: center;
+    margin-bottom: 30px;
+}
+
+.claims-header h2 {
+    font-size: 2rem;
+    margin-bottom: 10px;
+    color: #333;
+}
+
+.claims-header p {
+    color: #666;
+    line-height: 1.6;
+}
+
+.claims-form {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+.form-group {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.form-group label {
+    font-weight: 500;
+    color: #333;
+    font-size: 0.95rem;
+}
+
+.form-group input,
+.form-group textarea,
+.form-group select {
+    padding: 12px 16px;
+    border: 1px solid #e0e0e0;
+    border-radius: 8px;
+    font-family: inherit;
+    font-size: 1rem;
+    transition: border-color 0.3s;
+    background-color: white;
+}
+
+.form-group input:focus,
+.form-group textarea:focus,
+.form-group select:focus {
+    outline: none;
+    border-color: #d6a74e;
+}
+
+.submit-btn {
+    margin-top: 10px;
+    padding: 14px;
+    background-color: #d6a74e;
+    color: white;
+    border: none;
+    border-radius: 8px;
+    font-size: 1rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background-color 0.3s, transform 0.1s;
+}
+
+.submit-btn:hover {
+    background-color: #bf9543;
+}
+
+.submit-btn:active {
+    transform: scale(0.98);
+}
+
+@media (max-width: 768px) {
+    .claims-container {
+        padding: 25px;
+    }
+}
+
+@media (max-width: 400px) {
+    .claims-page-wrapper {
+        padding: 30px 10px;
+    }
+
+    .claims-container {
+        padding: 20px;
+    }
+
+    .claims-header h2 {
+        font-size: 1.5rem;
+    }
+}

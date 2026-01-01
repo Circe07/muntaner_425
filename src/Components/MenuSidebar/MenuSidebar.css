@@ -1,0 +1,120 @@
+.menu-sidebar-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.4);
+    backdrop-filter: blur(2px);
+    z-index: 1000;
+    opacity: 0;
+    visibility: hidden;
+    transition: all 0.4s ease-in-out;
+}
+
+.menu-sidebar-overlay.open {
+    opacity: 1;
+    visibility: visible;
+}
+
+.menu-sidebar {
+    position: fixed;
+    top: 0;
+    left: -350px;
+    /* Hidden to the left */
+    width: 300px;
+    height: 100vh;
+    height: 100dvh;
+    /* Dynamic height for mobile */
+    background: #312f2e;
+    box-shadow: 5px 0 15px rgba(0, 0, 0, 0.1);
+    z-index: 1001;
+    transition: left 0.3s ease-in-out;
+    display: flex;
+    flex-direction: column;
+    padding: 20px;
+}
+
+.menu-sidebar.open {
+    left: 0;
+}
+
+.menu-header {
+    display: flex;
+    justify-content: flex-end;
+}
+
+.menu-close-btn {
+    background: none;
+    border: none;
+    font-size: 1.5rem;
+    cursor: pointer;
+    color: var(--primary-text-color);
+    transition: transform 0.2s;
+}
+
+.menu-close-btn:hover {
+    transform: rotate(90deg);
+}
+
+.menu-section {
+    margin-bottom: 5px;
+}
+
+.menu-section h3 {
+    font-family: 'Playfair Display', serif;
+    font-size: 1.5rem;
+    border-bottom: 1px solid #1a1a1a;
+    padding-bottom: 10px;
+    margin-bottom: 15px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+.menu-item {
+    display: block;
+    font-family: 'Lato', sans-serif;
+    font-size: 1.1rem;
+    color: var(--primary-text-color);
+    padding: 10px 0;
+    cursor: pointer;
+    transition: color 0.2s, padding-left 0.2s;
+}
+
+.menu-item:hover {
+    color: var(--primary-text-color);
+    padding-left: 10px;
+    /* Subtle slide effect */
+    font-weight: bold;
+}
+
+@media (max-width: 768px) {
+    .menu-sidebar {
+        width: 80%;
+        /* Wider on mobile */
+        max-width: 300px;
+    }
+
+    .menu-section h3 {
+        font-size: 1.3rem;
+    }
+
+    .menu-item {
+        font-size: 1rem;
+    }
+}
+
+@media (max-width: 480px) {
+    .menu-section h3 {
+        font-size: 1.1rem;
+        /* Smaller header */
+        margin-bottom: 10px;
+        padding-bottom: 5px;
+    }
+
+    .menu-item {
+        font-size: 0.9rem;
+        /* Smaller items */
+        padding: 8px 0;
+    }
+}

@@ -1,34 +1,26 @@
-import {useContext } from "react"
+import { useContext } from "react"
 import { Context } from "../../Context/Context"
 import CartItemCounter from "./CartItemCounter"
+import EuroOutlinedIcon from '@mui/icons-material/EuroOutlined';
+import ClearOutlinedIcon from '@mui/icons-material/ClearOutlined';
 
 const CartElements = () => {
-    const {cart, setCart} = useContext(Context)
-
-    const deleteProducts = (id) => {
-        const foundId = cart.find((element) => element.id === id)
-
-        const newCart = cart.filter((element) => {
-            return element !== foundId
-        })
-
-        setCart(newCart)
-    }
-
-
+    const { cart, deleteProduct } = useContext(Context)
 
     return cart.map((product) => {
         return (
-            <div className="product-card-container" key={product.id}>
-                <img src={product.img} alt="product-card"/>
-                <h3>{product.name}</h3>
-                <CartItemCounter product={product}/>
-                <h4>{product.price * product.quanty}</h4>
-                <h3 className="cart-delete-product" onClick={() => deleteProducts(product.id)}>
-                    ❌
+            <div className="cart-item-row" key={product.id}>
+                <img src={product.img} alt="product-card" />
+                <div className="cart-item-details">
+                    <h3>{product.name}</h3>
+                    <CartItemCounter product={product} />
+                    <h4>{product.price * product.quanty}<EuroOutlinedIcon /></h4>
+                </div>
+                <h3 className="cart-delete-product" onClick={() => deleteProduct(product.id)}>
+                    <ClearOutlinedIcon />
                 </h3>
             </div>
-          )
+        )
     })
 
 }

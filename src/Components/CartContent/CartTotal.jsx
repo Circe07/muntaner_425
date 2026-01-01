@@ -1,13 +1,14 @@
-import {useContext } from "react"
+import { useContext } from "react"
 import { Context } from "../../Context/Context"
+import EuroOutlinedIcon from '@mui/icons-material/EuroOutlined';
 
 const CartTotal = () => {
-    const {cart} = useContext(Context)
+  const { cart } = useContext(Context)
 
-    const total = cart.reduce((acc, el) => acc + el.price * el.quanty, 0 )
+  const total = cart.reduce((acc, el) => acc + el.price * el.quanty, 0)
   return (
     <div className="cartTotal">
-        <h3>total a pagar: {total}</h3>
+      <h3>Total a pagar:  {total} <EuroOutlinedIcon /></h3>
     </div>
   )
 }

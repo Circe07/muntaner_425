@@ -1,29 +1,80 @@
 .banner {
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  height: 18rem;
+  display: flex;
+  /* Added flex to center content */
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  transition: background-image 2s ease-in-out;
+}
+
+.banner-container {
+  text-align: center;
+  padding: 0;
+  /* Removed large padding as we use flex centering */
+  color: var(--primary-text-color);
+}
+
+.banner-container h1 {
+  font-size: 3.8rem;
+  font-weight: 300;
+  margin-bottom: 0.5rem;
+  letter-spacing: 2px;
+}
+
+.banner-container p {
+  font-size: 1.2rem;
+  font-weight: 250;
+  letter-spacing: 4px;
+  text-transform: uppercase;
+  margin: 0;
+}
+
+@media (max-width: 1165px) {
+  .banner {
+    height: 30vh;
     background-size: cover;
-    background-position: center;
-    height: 80vh;
-  
-    background-image: linear-gradient(rgba(0, 0, 0, 0.4), rgba(0, 0, 0, 0.4)),
-      url("https://images.unsplash.com/photo-1470058869958-2a77ade41c02?q=80&w=2940&auto=format&fit=crop&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D");
   }
-  
-  .banner-container {
-    text-align: center;
-    padding: 15% 0;
+
+  .banner-container h1 {
+    font-size: 1.5rem;
   }
-  
-  .banner h1 {
-    margin: 0;
-    color: white;
-    text-shadow: 1px 1px 3px rgba(0, 0, 0, 0.2);
-    font-size: 62px;
-    font-weight: bold;
+
+  .banner-container p {
+    font-size: 0.8rem;
   }
-  
-  .banner p {
-    font-size: 30px;
-    color: white;
-    opacity: 0.7;
-    text-shadow: 1px 1px 3px rgba(0, 0, 0, 0.2);
+}
+
+@media (max-width: 768px) {
+  .banner {
+    height: 35vh;
   }
-  
+
+  .banner-container h1 {
+    font-size: 2rem;
+    margin-bottom: 10px;
+  }
+
+  .banner-container p {
+    font-size: 0.9rem;
+    letter-spacing: 2px;
+  }
+}
+
+@media (max-width: 480px) {
+  .banner {
+    height: 30vh;
+    min-height: 200px;
+  }
+
+  .banner-container h1 {
+    font-size: 1.5rem;
+  }
+
+  .banner-container p {
+    font-size: 0.75rem;
+  }
+}

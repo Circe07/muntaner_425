@@ -1,0 +1,310 @@
+@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700&display=swap');
+
+.product-detail-wrapper {
+    background-color: #fff;
+    min-height: 100vh;
+}
+
+.product-detail-container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 40px 20px;
+}
+
+.product-main {
+    display: flex;
+    justify-content: space-between;
+    gap: 50px;
+    margin-bottom: 80px;
+}
+
+.product-image-section {
+    width: 50%;
+    background-color: #f9f9f9;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 40px;
+    border-radius: 4px;
+}
+
+.product-image-section img {
+    max-width: 100%;
+    max-height: 500px;
+    object-fit: contain;
+    mix-blend-mode: multiply;
+}
+
+.product-info-section {
+    width: 50%;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+}
+
+.product-title {
+    font-family: 'Playfair Display', serif;
+    font-size: 2.5rem;
+    font-weight: 400;
+    margin-bottom: 5px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+.product-ref {
+    font-size: 0.8rem;
+    color: #999;
+    margin-bottom: 25px;
+}
+
+.product-desc {
+    font-size: 1rem;
+    color: #555;
+    line-height: 1.6;
+    margin-bottom: 30px;
+    font-family: 'Lato', sans-serif;
+}
+
+.product-price {
+    font-family: 'Playfair Display', serif;
+    font-size: 2rem;
+    font-weight: 700;
+    margin-bottom: 25px;
+    display: flex;
+    align-items: center;
+    gap: 2px;
+}
+
+.product-actions-row {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+}
+
+.pdp-quantity-selector {
+    display: flex;
+    align-items: center;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    height: 50px;
+}
+
+.pdp-quantity-selector button {
+    background: transparent;
+    border: none;
+    width: 40px;
+    height: 100%;
+    font-size: 1.2rem;
+    cursor: pointer;
+    transition: background 0.2s;
+}
+
+.pdp-quantity-selector button:hover {
+    background: #f0f0f0;
+}
+
+.pdp-quantity-selector span {
+    width: 30px;
+    text-align: center;
+    font-weight: 600;
+}
+
+.pdp-add-btn {
+    flex-grow: 1;
+    height: 50px;
+    background-color: #1a1a1a;
+    color: white;
+    border: none;
+    font-size: 1rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    cursor: pointer;
+    transition: all 0.3s;
+    border-radius: 4px;
+}
+
+.pdp-add-btn:hover {
+    background-color: #333;
+    transform: translateY(-2px);
+}
+
+/* Recommendations */
+.recommendations-section {
+    border-top: 1px solid #eee;
+    padding-top: 40px;
+}
+
+.recommendations-section h2 {
+    text-align: center;
+    font-family: 'Playfair Display', serif;
+    font-size: 1.8rem;
+    margin-bottom: 40px;
+    text-transform: uppercase;
+}
+
+/* Carousel */
+.carousel-container {
+    position: relative;
+    max-width: 100%;
+    display: flex;
+    align-items: center;
+}
+
+.recommendations-carousel {
+    display: flex;
+    gap: 20px;
+    overflow-x: auto;
+    scroll-behavior: smooth;
+    padding: 20px 5px;
+    width: 100%;
+    scrollbar-width: none;
+}
+
+.recommendations-carousel::-webkit-scrollbar {
+    display: none;
+}
+
+.carousel-btn {
+    background-color: #fff;
+    border: 1px solid #eee;
+    color: #333;
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+    z-index: 10;
+    transition: all 0.2s;
+    flex-shrink: 0;
+}
+
+.carousel-btn:hover {
+    background-color: #312f2e;
+    color: white;
+}
+
+.carousel-btn.left {
+    margin-right: 10px;
+}
+
+.carousel-btn.right {
+    margin-left: 10px;
+}
+
+.rec-card {
+    min-width: 250px;
+    max-width: 250px;
+    text-decoration: none;
+    color: inherit;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    transition: transform 0.3s;
+}
+
+.rec-card:hover {
+    transform: translateY(-5px);
+}
+
+.rec-image {
+    width: 100%;
+    height: 250px;
+    background: #f4f4f4;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 15px;
+    border-radius: 4px;
+}
+
+.rec-image img {
+    max-width: 80%;
+    max-height: 80%;
+    object-fit: contain;
+    mix-blend-mode: multiply;
+}
+
+.rec-card h3 {
+    font-size: 1rem;
+    margin: 10px 0;
+    font-weight: 500;
+    text-transform: uppercase;
+}
+
+.rec-price {
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    gap: 2px;
+}
+
+
+/* Responsive Mobile Styles */
+@media (max-width: 900px) {
+    .product-main {
+        flex-direction: column;
+        gap: 30px;
+    }
+
+    .product-image-section,
+    .product-info-section {
+        width: 100%;
+    }
+
+    .product-image-section {
+        height: 350px;
+    }
+}
+
+@media (max-width: 480px) {
+    .product-detail-container {
+        padding: 20px 10px;
+    }
+
+    .product-image-section {
+        height: 250px;
+        padding: 0px;
+    }
+
+    .product-title {
+        font-size: 1.8rem;
+    }
+
+    .product-actions-row {
+        gap: 10px;
+    }
+
+    .pdp-add-btn {
+        font-size: 0.9rem;
+    }
+
+    /* Recommendations Carousel Mobile */
+    .carousel-btn {
+        display: none;
+        /* Swipe is better on mobile */
+    }
+
+    .recommendations-carousel {
+        padding: 10px 0;
+        gap: 15px;
+    }
+
+    .rec-card {
+        min-width: 160px;
+        /* Smaller cards for mobile */
+        max-width: 160px;
+    }
+
+    .rec-image {
+        height: 160px;
+    }
+
+    .rec-card h3 {
+        font-size: 0.8rem;
+    }
+}

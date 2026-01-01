@@ -1,0 +1,219 @@
+.cart-sidebar-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.4);
+    /* Slightly lighter but clean overlay */
+    backdrop-filter: blur(2px);
+    /* Add blur for premium feel */
+    z-index: 1000;
+    opacity: 0;
+    visibility: hidden;
+    transition: all 0.4s ease-in-out;
+}
+
+.cart-sidebar-overlay.open {
+    opacity: 1;
+    visibility: visible;
+}
+
+.cart-sidebar {
+    position: fixed;
+    top: 0;
+    right: -400px;
+    /* Hidden via position */
+    width: 350px;
+    height: 100vh;
+    /* Fallback */
+    height: 100dvh;
+    /* Dynamic height for mobile browsers */
+    background: #312f2e;
+    box-shadow: -5px 0 15px rgba(0, 0, 0, 0.1);
+    z-index: 1001;
+    transition: right 0.3s ease-in-out;
+    display: flex;
+    flex-direction: column;
+}
+
+.cart-sidebar.open {
+    right: 0;
+}
+
+.cart-sidebar-header {
+    padding: 20px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 1px solid #312f2e;
+}
+
+.cart-sidebar-header h2 {
+    margin: 0;
+    font-size: 1.5rem;
+    font-family: 'Playfair Display', serif;
+}
+
+.close-btn {
+    background: none;
+    border: none;
+    font-size: 1.5rem;
+    cursor: pointer;
+    transition: transform 0.2s;
+}
+
+.close-btn:hover {
+    transform: rotate(90deg);
+}
+
+.cart-sidebar-content {
+    flex-grow: 1;
+    overflow-y: auto;
+    padding: 20px;
+}
+
+/* Reusing basic cart item styles or defining mini ones */
+.mini-cart-item {
+    display: flex;
+    margin-bottom: 20px;
+    border-bottom: 1px solid #312f2e;
+    padding-bottom: 10px;
+    align-items: center;
+    /* Align items vertically */
+}
+
+.mini-cart-item img {
+    width: 60px;
+    height: 70px;
+    object-fit: cover;
+    margin-right: 15px;
+    border-radius: 4px;
+}
+
+.mini-cart-details {
+    flex-grow: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+}
+
+.mini-cart-details h3 {
+    margin: 0;
+    font-size: 0.9rem;
+}
+
+/* Adjust CartItemCounter for sidebar if needed, generally it fits */
+.mini-cart-details .counter-container {
+    padding: 0 5px;
+    border-radius: 4px;
+    width: fit-content;
+    transform: scale(0.9);
+    /* Slightly smaller */
+    transform-origin: left;
+}
+
+.mini-cart-details p {
+    margin: 0;
+    color: var(--primary-text-color);
+    font-size: 0.9rem;
+    font-weight: bold;
+    display: flex;
+    align-items: center;
+    gap: 2px;
+}
+
+.mini-cart-details p svg {
+    font-size: inherit !important;
+}
+
+
+.mini-delete-btn {
+    cursor: pointer;
+    font-size: 1.2rem;
+    color: var(--primary-text-color);
+    background-color: #312f2e;
+    border: 1px solid black;
+    border-radius: 4px;
+    margin-left: 10px;
+    padding: 1px 5px;
+    transition: color 0.3s;
+}
+
+.mini-delete-btn:hover {
+    color: #e74c3c;
+}
+
+.cart-sidebar-footer {
+    padding: 20px;
+    border-top: 1px solid #1a1a1a;
+    /* Darker divider */
+}
+
+.total-display {
+    display: flex;
+    justify-content: space-between;
+    font-weight: bold;
+    margin-bottom: 20px;
+    font-size: 1.2rem;
+    font-family: 'Playfair Display', serif;
+}
+
+.total-display span {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+}
+
+.total-display span svg {
+    font-size: inherit !important;
+}
+
+.checkout-btn {
+    width: 100%;
+    padding: 18px;
+    background: #1a1a1a;
+    color: var(--primary-text-color);
+    border: 1px solid #1a1a1a;
+    text-transform: uppercase;
+    cursor: pointer;
+    font-weight: 600;
+    letter-spacing: 2px;
+    font-family: 'Lato', sans-serif;
+    font-size: 0.9rem;
+    transition: all 0.3s ease;
+}
+
+.checkout-btn:hover {
+    background: #312f2e;
+    color: var(--primary-text-color);
+}
+
+@media (max-width: 480px) {
+    .cart-sidebar-header h2 {
+        font-size: 1.2rem;
+    }
+
+    .mini-cart-details h3 {
+        font-size: 0.8rem;
+    }
+
+    .mini-cart-details p {
+        font-size: 0.85rem;
+    }
+
+    .total-display {
+        font-size: 1.1rem;
+    }
+}
+
+@media (max-width: 400px) {
+    .cart-sidebar {
+        width: 100%;
+        right: -100%;
+    }
+
+    .cart-sidebar.open {
+        right: 0;
+    }
+}

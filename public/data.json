@@ -1,23 +1,38 @@
 [
-    {
-      "id": 1,
-      "name": "Monstera",
-      "price": 10,
-      "img": "https://res.cloudinary.com/easyplant/image/fetch/f_auto,q_auto:good,c_fill,w_728,h_852/https://cdn.shopify.com/s/files/1/0513/8032/2473/files/MonsteraDeliciosaLarge_Sandy_Pink.jpg?v=1709222612",
-      "quanty": 1
-    },
-    {
-      "id": 2,
-      "name": "Ficus Ruby",
-      "price": 20,
-      "img": "https://res.cloudinary.com/easyplant/image/fetch/f_auto,q_auto:good,c_fill,w_1400,h_1624/https://cdn.shopify.com/s/files/1/0513/8032/2473/products/FicusRubyLarge_Natural_Bamboo.jpg?v=1709220381",
-      "quanty": 1
-    },
-    {
-      "id": 3,
-      "name": "Money Tree",
-      "price": 27,
-      "img": "https://res.cloudinary.com/easyplant/image/fetch/f_auto,q_auto:good,c_fill,w_728,h_852/https://cdn.shopify.com/s/files/1/0513/8032/2473/products/MoneyTreeLarge_Natural_Bamboo_e5fed03a-cff4-4679-a7b0-67de4079ec48.jpg?v=1709222220",
-      "quanty": 1
-    }
-  ]
+  {
+    "id": 1,
+    "name": "Charcoal Face Wash",
+    "price": 25,
+    "img": "/images/mens_face_wash.png",
+    "quanty": 1,
+    "category": "men",
+    "description": "Deeply cleanse your skin with our activated charcoal face wash. Removes impurities and excess oil for a fresh, matte finish."
+  },
+  {
+    "id": 2,
+    "name": "Premium Beard Oil",
+    "price": 30,
+    "img": "/images/mens_beard_oil.png",
+    "quanty": 1,
+    "category": "men",
+    "description": "Nourish and soften your beard with our premium blend of natural oils. Promotes healthy growth and adds a subtle, masculine scent."
+  },
+  {
+    "id": 3,
+    "name": "Luxury Day Cream",
+    "price": 55,
+    "img": "/images/mens_face_wash.png",
+    "quanty": 1,
+    "category": "women",
+    "description": "Hydrate and protect your skin with our luxury day cream. Enriched with vitamins and antioxidants for a radiant, youthful complexion."
+  },
+  {
+    "id": 4,
+    "name": "Rose Essence Perfume",
+    "price": 80,
+    "img": "/images/mens_beard_oil.png",
+    "quanty": 1,
+    "category": "women",
+    "description": "Experience the timeless elegance of rose essence. A delicate and captivating fragrance that lasts all day long."
+  }
+]

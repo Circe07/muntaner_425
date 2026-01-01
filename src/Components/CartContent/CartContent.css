@@ -1,30 +1,215 @@
-.product-card-container {
-    display: flex;
-    justify-content: space-around;
-    flex-wrap: wrap;
-    margin: 30px;
+.cart-page-wrapper {
+  min-height: 60vh;
+  padding: 20px;
+  max-width: 1000px;
+  margin: 0 auto;
+}
+
+.cart-container {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.cart-item-row {
+  display: flex;
+  align-items: center;
+  background: #312f2e;
+  padding: 20px;
+  border-radius: 12px;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.05);
+}
+
+.cart-item-row img {
+  width: 100px;
+  height: 100px;
+  object-fit: cover;
+  border-radius: 8px;
+  margin-right: 20px;
+}
+
+.cart-item-details {
+  flex-grow: 1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+}
+
+.cart-item-details h3 {
+  margin: 0;
+  font-size: 1.1rem;
+  font-weight: 500;
+}
+
+.cart-item-details h4 {
+  margin: 0;
+  font-weight: bold;
+  font-size: 1.1rem;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.cart-item-details h4 svg {
+  font-size: inherit !important;
+}
+
+.cart-delete-product {
+  cursor: pointer;
+  font-size: 1.2rem;
+  color: var(--primary-text-color);
+  background-color: #312f2e;
+  border: 1px solid black;
+  border-radius: 4px;
+  margin-left: 20px;
+  padding-top: 1px;
+  padding-bottom: 1px;
+  padding-left: 5px;
+  padding-right: 5px;
+  transition: color 0.3s;
+}
+
+.cart-delete-product:hover {
+  color: #e74c3c;
+}
+
+.cartTotal {
+  margin-top: 30px;
+  text-align: left;
+  font-size: 1.5rem;
+  font-weight: bold;
+  padding: 20px;
+  background: #312f2e;
+  border-radius: 12px;
+}
+
+.cartTotal h3 {
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+.cartTotal h3 svg {
+  font-size: inherit !important;
+  margin-bottom: 2px;
+}
+
+.cart-message-center {
+  text-align: center;
+  margin-top: 100px;
+  font-weight: 300;
+  color: var(--primary-text-color);
+  ;
+}
+
+/* Counter Styles - Premium Pill Design */
+.counter-container {
+  display: flex;
+  align-items: center;
+  border: 1px solid #000000;
+  border-radius: 4px;
+  overflow: hidden;
+  background: #312f2e;
+  margin: 0 10px;
+  height: 32px;
+}
+
+.counter-button {
+  background: transparent;
+  border: none;
+  font-size: 1rem;
+  padding: 0 10px;
+  cursor: pointer;
+  color: var(--primary-text-color);
+  transition: background 0.2s, color 0.2s;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.counter-button:hover {
+  background: #312f2e;
+  color: var(--primary-text-color);
+}
+
+.counter-value {
+  font-weight: 600;
+  min-width: 30px;
+  text-align: center;
+  font-size: 0.9rem;
+  color: var(--primary-text-color);
+  border-left: 1px solid #312f2e;
+  border-right: 1px solid #312f2e;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+@media (max-width: 768px) {
+  .cart-page-wrapper {
+    padding: 10px;
   }
-  
-  .product-card-container > img {
-    height: 120px;
-    width: 100px;
+
+  .cart-item-row {
+    flex-direction: column;
     text-align: center;
+    gap: 15px;
+    padding: 15px;
+    position: relative;
+  }
+
+  .cart-item-row img {
+    margin-right: 0;
+    width: 80px;
+    height: 80px;
+  }
+
+  .cart-item-details {
+    width: 100%;
+    flex-direction: column;
+    gap: 10px;
+    justify-content: center;
+  }
+
+  .cart-item-details h3 {
+    font-size: 1rem;
+  }
+
+  .cart-item-details h4 {
+    justify-content: center;
+  }
+
+  .cart-delete-product {
+    margin-left: 0;
+    margin-top: 0;
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    border: none;
+    background: transparent;
   }
 
   .cartTotal {
     text-align: center;
+    padding: 15px;
   }
 
-  .cart-delete-product {
-    cursor: pointer;
+  .cartTotal h3 {
+    justify-content: center;
+    font-size: 1.2rem;
   }
+}
 
-  .counter-button {
-    cursor: pointer;
-    font-weight: bold;
-  }
-
-  .cart-message-center {
-    text-align: center;
-    margin-top: 40px;
-  }
+.paypal-container-wrapper {
+  margin-top: 20px;
+  max-width: 500px;
+  /* Prevent it from being too wide */
+  margin-left: auto;
+  margin-right: auto;
+}
