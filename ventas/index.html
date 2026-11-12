@@ -40,6 +40,12 @@
     <button class="ag-btn ag-btn--glass body" id="edit-goals" data-open-goals>Configurar objetivos de este mes</button>
   </section>
 
+  <section class="card ag-card ag-grain" id="unit-card" hidden>
+    <h2 class="title3">Incentivos por unidad <span class="badge" id="unit-total"></span></h2>
+    <table id="unit-table"><thead><tr><th>Modelo</th><th class="n">Uds.</th><th class="n">Importes (1ª / 2ª / …)</th><th class="n">Próxima</th><th class="n">Cobras</th></tr></thead><tbody></tbody></table>
+    <p class="hint footnote banner-text" id="unit-warn" hidden></p>
+  </section>
+
   <section class="card ag-card ag-grain">
     <h2 class="title3">Historial de meses</h2>
     <table id="history"><thead><tr><th>Mes</th><th>Alta</th><th>Media</th><th>Baja</th><th>Incentivo</th></tr></thead><tbody></tbody></table>
@@ -83,17 +89,25 @@
 </main>
 <dialog id="goal-dialog" class="ag-grain">
   <form method="dialog" id="goals-form">
-    <h2 id="goal-title">Objetivos</h2>
-    <p class="hint footnote">Unidades a vender por gama y lo que cobras si llegas al 100%. Desde el 80% de cumplimiento cobras ese mismo % del incentivo; por debajo del 80%, nada.</p>
-    <div class="grid2">
-      <label>Alta · unidades <input class="ag-input body" type="number" min="0" id="goal-alta" required></label>
-      <label>Alta · incentivo 100% (€) <input class="ag-input body" type="number" min="0" step="any" id="inc-alta"></label>
-      <label>Media · unidades <input class="ag-input body" type="number" min="0" id="goal-media" required></label>
-      <label>Media · incentivo 100% (€) <input class="ag-input body" type="number" min="0" step="any" id="inc-media"></label>
-      <label>Baja · unidades <input class="ag-input body" type="number" min="0" id="goal-baja" required></label>
-      <label>Baja · incentivo 100% (€) <input class="ag-input body" type="number" min="0" step="any" id="inc-baja"></label>
-    </div>
-    <div class="row"><button class="ag-btn ag-btn--glass body" type="button" id="goal-cancel">Ahora no</button><button class="primary" value="ok">Guardar</button></div>
+    <h2 id="goal-title" class="title3">Objetivos</h2>
+    <p class="hint footnote">Por gama: unidades objetivo, incentivo al 100% y tope de cumplimiento. Por debajo del 80% no se cobra; desde el 80% se cobra lineal (tu % × incentivo) hasta el tope.</p>
+    <div class="gbox"><strong class="headline">Alta</strong><div class="grid3">
+      <label>Unidades <input class="ag-input body" type="number" min="0" id="goal-alta" required></label>
+      <label>Incentivo 100% (€) <input class="ag-input body" type="number" min="0" step="any" id="inc-alta"></label>
+      <label>Tope (%) <input class="ag-input body" type="number" min="100" step="any" id="max-alta" placeholder="100"></label></div></div>
+    <div class="gbox"><strong class="headline">Media</strong><div class="grid3">
+      <label>Unidades <input class="ag-input body" type="number" min="0" id="goal-media" required></label>
+      <label>Incentivo 100% (€) <input class="ag-input body" type="number" min="0" step="any" id="inc-media"></label>
+      <label>Tope (%) <input class="ag-input body" type="number" min="100" step="any" id="max-media" placeholder="100"></label></div></div>
+    <div class="gbox"><strong class="headline">Baja</strong><div class="grid3">
+      <label>Unidades <input class="ag-input body" type="number" min="0" id="goal-baja" required></label>
+      <label>Incentivo 100% (€) <input class="ag-input body" type="number" min="0" step="any" id="inc-baja"></label>
+      <label>Tope (%) <input class="ag-input body" type="number" min="100" step="any" id="max-baja" placeholder="100"></label></div></div>
+    <div class="gbox"><strong class="headline">Incentivos por unidad</strong>
+      <p class="hint footnote">Se cobran desde la primera unidad. Importes en orden (1ª, 2ª, 3ª…); el último se repite para las siguientes.</p>
+      <div id="unit-rules"></div>
+      <button class="ag-btn ag-btn--glass body" type="button" id="add-rule">Añadir modelo</button></div>
+    <div class="row"><button class="ag-btn ag-btn--glass body" type="button" id="goal-cancel">Ahora no</button><button class="ag-btn ag-btn--primary body" value="ok">Guardar</button></div>
   </form>
 </dialog>
 <script src="app.js"></script>

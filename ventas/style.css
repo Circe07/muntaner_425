@@ -85,3 +85,13 @@ dialog form{flex-direction:column;align-items:stretch}
 .month .ag-input{min-width:0;width:170px}
 .two{align-items:start}
 @media(max-width:420px){.topbar{padding:0 var(--space-2)}.topbar h1{font-size:15px}.month .ag-input{width:178px;padding:0 var(--space-2)}.month{gap:0}.ag-navbar__action{width:32px}}
+
+dialog{max-width:560px;max-height:92vh;overflow:auto}
+.gbox{border:1px solid var(--glass-edge);border-radius:var(--radius-md);padding:var(--space-3);background:var(--surface);display:grid;gap:var(--space-2)}
+.gbox .hint{margin:0}
+.grid3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:var(--space-2)}
+@media(max-width:480px){.grid3{grid-template-columns:1fr}}
+.rule{display:grid;grid-template-columns:1fr 1fr auto;gap:var(--space-2);align-items:center;margin-bottom:var(--space-2)}
+@media(max-width:480px){.rule{grid-template-columns:1fr auto}.rule select{grid-column:1/-1}}
+#unit-warn{color:var(--warning);font-weight:600}
+#unit-table{display:block;overflow-x:auto}

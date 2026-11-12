@@ -9,11 +9,15 @@ const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;'
 const OLD_SEED = ['Magic Pad 4 12,3" OLED','Honor 600 5G 8+512','Pad 10 12,1" 8GB (1602942)','Pad 10 12,1" 8GB (1668755)','600 Lite 5G (1668633)','600 Lite 5G (1668702)','600 Lite 5G (1668634)','600 Smart 6,87" 5G','Magic 8 Lite (1611266)','Magic 8 Lite (1611264)','Pad X8B 11" 4RAM/64GB','Pad X8B 11" 6RAM/256GB','400 Smart 4G (1604932)','400 Smart 4G (1604933)','X5C Plus 4G'];
 const SEED = [ // [nombre, gama]  (High=alta, Mid=media, Entry=baja)
   ['Magic V6', 'alta'], ['M8 Pro', 'alta'], ['H600 Pro', 'alta'], ['H600', 'alta'], ['PAD 4', 'alta'],
-  ['H400', 'media'], ['M8 Lite', 'media'], ['600 Lite', 'media'], ['PAD X9 max', 'media'], ['PAD 10', 'media'],
+  ['H400', 'media'], ['M8 Lite', 'media'], ['H600 Lite', 'media'], ['PAD X9 max', 'media'], ['PAD 10', 'media'],
   ['H600 Smart', 'baja'], ['PAD X8b', 'baja'], ['PAD X9a', 'baja'], ['H400 Smart', 'baja'], ['PAD X8a', 'baja'], ['X5c Plus', 'baja'],
 ];
-// Acumulado de noviembre 2026 hasta el 10/11 (sin desglosar por modelo)
-const NOV = { goals: { alta: 30, media: 85, baja: 100, inc: { alta: 400, media: 400, baja: 200 } }, sold: { alta: 3, media: 19, baja: 19 } };
+// Campaña noviembre 2026 (comunicado): tope por gama e incentivos unitarios desde la primera unidad.
+const NOV = {
+  goals: { alta: 30, media: 85, baja: 100, inc: { alta: 400, media: 400, baja: 200 }, max: { alta: 140, media: 120, baja: 110 },
+    unit: [{ model: 'Magic V6', amounts: [50, 70, 100] }, { model: 'M8 Pro', amounts: [20] }, { model: 'H600', amounts: [10] }, { model: 'H600 Lite', amounts: [5] }] },
+  sold: { alta: 3, media: 19, baja: 19 }
+};
 const nowMonth = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`; };
 let state = load();
 let month = nowMonth();
@@ -22,21 +26,26 @@ function load() {
   let s = null;
   try { s = JSON.parse(localStorage.getItem(KEY)); } catch (e) {}
   if (!s || !s.models) s = { models: [], sales: [], goals: {} };
-  if ((s.seedVersion || 0) >= 2 && (s.seedVersion || 0) < 3) {
-    const g = s.goals['2026-11'];
-    if (g && !g.inc && g.alta === 30 && g.media === 85 && g.baja === 100) g.inc = NOV.goals.inc;
-    s.seedVersion = 3;
-  }
-  if ((s.seedVersion || 0) < 2) {
+  const v = s.seedVersion || 0;
+  if (v < 2) {
     const used = new Set(s.sales.map(x => x.modelId));
     s.models = s.models.filter(m => !(OLD_SEED.includes(m.name) && !used.has(m.id)));
-    SEED.forEach(([name, gama]) => { if (!s.models.some(m => m.name === name)) s.models.push({ id: uid(), name, gama }); });
+    SEED.forEach(([name, gama]) => { if (!s.models.some(m => m.name === name || (name === 'H600 Lite' && m.name === '600 Lite'))) s.models.push({ id: uid(), name, gama }); });
     if (!s.goals['2026-11'] && !s.sales.some(x => x.date.startsWith('2026-11'))) {
-      s.goals['2026-11'] = NOV.goals;
+      s.goals['2026-11'] = structuredClone(NOV.goals);
       GAMAS.forEach(g => s.sales.push({ id: uid(), date: '2026-11-10', modelId: null, name: 'Acumulado hasta 10/11 (sin desglosar)', gama: g, qty: NOV.sold[g] }));
     }
-    s.seedVersion = 3;
+  } else if (v < 3) {
+    const g = s.goals['2026-11'];
+    if (g && !g.inc && g.alta === 30 && g.media === 85 && g.baja === 100) g.inc = NOV.goals.inc;
   }
+  if (v < 4) { // "600 Lite" pasa a llamarse "H600 Lite"; tope y unitarios de noviembre
+    s.models.forEach(m => { if (m.name === '600 Lite') m.name = 'H600 Lite'; });
+    s.sales.forEach(x => { if (x.name === '600 Lite') x.name = 'H600 Lite'; });
+    const g = s.goals['2026-11'];
+    if (g && g.alta === 30 && g.media === 85 && g.baja === 100) { g.inc = g.inc || NOV.goals.inc; g.max = g.max || NOV.goals.max; g.unit = g.unit || structuredClone(NOV.goals.unit); }
+  }
+  s.seedVersion = 4;
   return s;
 }
 function save() { try { localStorage.setItem(KEY, JSON.stringify(state)); } catch (e) { alert('No se pudo guardar en el navegador.'); } }
@@ -44,10 +53,25 @@ function save() { try { localStorage.setItem(KEY, JSON.stringify(state)); } catc
 // Objetivo de cada mes: se configura a mano, no se hereda del mes anterior.
 const hasGoals = m => !!state.goals[m];
 const eur = n => (Math.round(n * 100) / 100).toLocaleString('es-ES', { maximumFractionDigits: 2 }) + ' €';
-const incOf = (g, x) => +((g.inc || {})[x]) || 0;
-// Incentivo cobrado: <80% → 0; del 80% al 99% → proporcional (cumplimiento × importe); ≥100% → importe completo.
-const earned = (sold, goal, inc) => !goal ? 0 : sold >= goal ? inc : sold >= Math.ceil(goal * 0.8) ? inc * sold / goal : 0;
 const goalsFor = m => state.goals[m] || { alta: 0, media: 0, baja: 0 };
+const incOf = (g, x) => +((g.inc || {})[x]) || 0;
+const maxOf = (g, x) => Math.max(100, +((g.max || {})[x]) || 100);   // tope de cumplimiento (%)
+const soldIn = (sales, x) => sales.filter(s => s.gama === x).reduce((a, s) => a + s.qty, 0);
+// Incentivo de gama: <80% → 0; desde el 80% lineal (cumplimiento × importe) hasta el tope de la gama.
+const earned = (sold, goal, inc, maxPct) => !goal || sold < Math.ceil(goal * 0.8) ? 0 : inc * Math.min(sold / goal, maxPct / 100);
+// Incentivo por unidad: importes en orden (1ª, 2ª, 3ª…); el último se repite para el resto.
+const unitPay = (amounts, n) => { let t = 0; for (let i = 0; i < n; i++) t += +amounts[Math.min(i, amounts.length - 1)] || 0; return t; };
+const unitRows = (g, sales) => (g.unit || []).map(r => {
+  const n = sales.filter(s => s.name === r.model).reduce((a, s) => a + s.qty, 0);
+  return { model: r.model, amounts: r.amounts, n, pay: unitPay(r.amounts, n), next: +r.amounts[Math.min(n, r.amounts.length - 1)] || 0 };
+});
+function incentives(m) {
+  const g = goalsFor(m), sales = state.sales.filter(s => s.date.startsWith(m));
+  let gamas = 0, gamasMax = 0;
+  GAMAS.forEach(x => { gamas += earned(soldIn(sales, x), +g[x] || 0, incOf(g, x), maxOf(g, x)); gamasMax += incOf(g, x) * maxOf(g, x) / 100; });
+  const units = unitRows(g, sales).reduce((a, r) => a + r.pay, 0);
+  return { gamas, gamasMax, units, total: gamas + units };
+}
 const MESES = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
 const monthName = m => { const [y, n] = m.split('-'); return `${MESES[+n - 1]} ${y}`; };
 const monthSales = () => state.sales.filter(s => s.date.startsWith(month)).sort((a, b) => b.date.localeCompare(a.date));
@@ -66,41 +90,45 @@ function render() {
   $('goal-banner').hidden = hasGoals(month);
   $('edit-goals').hidden = !hasGoals(month);
   $('gamas').innerHTML = GAMAS.map(g => {
-    const sold = sales.filter(s => s.gama === g).reduce((a, s) => a + s.qty, 0);
-    const goal = +goals[g] || 0;
-    const t80 = Math.ceil(goal * 0.8);
+    const sold = soldIn(sales, g), goal = +goals[g] || 0, mx = maxOf(goals, g), inc = incOf(goals, g);
+    const t80 = Math.ceil(goal * 0.8), tMax = Math.ceil(goal * mx / 100);
     const pct = goal ? Math.round(sold / goal * 100) : 0;
     const to80 = Math.max(0, t80 - sold), to100 = Math.max(0, goal - sold);
-    const fill = goal ? Math.min(100, sold / goal * 100) : 0;
-    const inc = incOf(goals, g);
+    const fill = goal ? Math.min(100, sold / (goal * mx / 100) * 100) : 0;
+    const marks = goal ? `<b style="left:${80 / mx * 100}%"><span>80%</span></b>` + (mx > 100 ? `<b style="left:${100 / mx * 100}%"><span>100%</span></b>` : '') : '';
     return `<div class="gama" style="--c:var(--${g})">
       <h3>${LABEL[g]} <span>${goal ? pct + '%' : 'sin objetivo'}</span></h3>
       <div class="big">${sold} <small>/ ${goal} uds.</small></div>
-      <div class="bar"><i style="width:${fill}%"></i>${goal ? `<b style="left:80%"><span>80%</span></b>` : ''}</div>
+      <div class="bar"><i style="width:${fill}%"></i>${marks}</div>
       <div class="miss"><span>Hasta 80% (${t80}): <strong class="${to80 || !goal ? '' : 'done'}">${goal ? (to80 || '✓') : '–'}</strong></span>
       <span>Hasta 100%: <strong class="${to100 || !goal ? '' : 'done'}">${goal ? (to100 || '✓') : '–'}</strong></span></div>
-      ${inc ? `<div class="inc">Incentivo ahora: <strong>${eur(earned(sold, goal, inc))}</strong><br>desde el 80%: ${eur(inc * 0.8)} · al 100%: ${eur(inc)}</div>` : ''}
+      ${inc ? `<div class="inc">Incentivo ahora: <strong>${eur(earned(sold, goal, inc, mx))}</strong><br>80%: ${eur(inc * 0.8)} · 100%: ${eur(inc)}${mx > 100 ? ` · tope ${mx}% (${tMax} uds.): ${eur(inc * mx / 100)}` : ''}</div>` : ''}
     </div>`;
   }).join('');
+
+  // incentivos por unidad
+  const rows = unitRows(goals, sales), inc = incentives(month);
+  $('unit-card').hidden = !rows.length;
+  $('unit-table').tBodies[0].innerHTML = rows.map(r => `<tr><td>${esc(r.model)}</td><td class="n">${r.n}</td><td class="n">${r.amounts.map(eur).join(' / ')}</td><td class="n">${eur(r.next)}</td><td class="n"><strong>${eur(r.pay)}</strong></td></tr>`).join('');
+  $('unit-total').textContent = eur(inc.units);
+  const lump = sales.filter(s => !s.modelId).reduce((a, s) => a + s.qty, 0);
+  $('unit-warn').hidden = !(rows.length && lump);
+  $('unit-warn').textContent = `${lump} uds. del acumulado sin desglosar no cuentan para estos incentivos. Añádelas como ventas por modelo y borra el acumulado.`;
+
   // total de incentivo
-  const totals = GAMAS.reduce((t, g) => {
-    const sold = sales.filter(s => s.gama === g).reduce((a, s) => a + s.qty, 0), goal = +goals[g] || 0, inc = incOf(goals, g);
-    t.now += earned(sold, goal, inc); t.max += inc; return t;
-  }, { now: 0, max: 0 });
-  $('inc-total').hidden = !totals.max;
-  $('inc-total').innerHTML = `Incentivo conseguido ahora: <strong>${eur(totals.now)}</strong> de ${eur(totals.max)} posibles`;
+  $('inc-total').hidden = !(inc.gamasMax || rows.length);
+  $('inc-total').innerHTML = `Incentivo conseguido ahora: <strong>${eur(inc.total)}</strong><br><span class="footnote">Gamas ${eur(inc.gamas)} (máx. ${eur(inc.gamasMax)}) + unidades ${eur(inc.units)}</span>`;
 
   // historial
   const ms = new Set([...Object.keys(state.goals), ...state.sales.map(s => s.date.slice(0, 7)), nowMonth()]);
   $('history').tBodies[0].innerHTML = [...ms].sort().reverse().map(m => {
     const g = goalsFor(m), ss = state.sales.filter(s => s.date.startsWith(m));
     const cells = GAMAS.map(x => {
-      const sold = ss.filter(s => s.gama === x).reduce((a, s) => a + s.qty, 0), goal = +g[x] || 0;
+      const sold = soldIn(ss, x), goal = +g[x] || 0;
       return `<td>${sold} / ${goal || '–'}${goal ? ` (${Math.round(sold / goal * 100)}%)` : ''}</td>`;
     }).join('');
-    let now = 0, max = 0;
-    GAMAS.forEach(x => { const sold = ss.filter(s => s.gama === x).reduce((a, s) => a + s.qty, 0); now += earned(sold, +g[x] || 0, incOf(g, x)); max += incOf(g, x); });
-    return `<tr data-month="${m}" class="${m === month ? 'cur' : ''}"><td>${monthName(m)}</td>${cells}<td>${max ? `${eur(now)} / ${eur(max)}` : '–'}</td></tr>`;
+    const t = incentives(m);
+    return `<tr data-month="${m}" class="${m === month ? 'cur' : ''}"><td>${monthName(m)}</td>${cells}<td>${hasGoals(m) ? eur(t.total) : '–'}</td></tr>`;
   }).join('');
 
   // por modelo (ventas del mes agrupadas por nombre; incluye modelos activos sin ventas)
@@ -111,11 +139,11 @@ function render() {
     if (!map.has(k)) map.set(k, { name: s.name, gama: s.gama, qty: 0 });
     map.get(k).qty += s.qty;
   });
-  const rows = [...map.values()].sort((a, b) => b.qty - a.qty || a.name.localeCompare(b.name));
-  $('by-model').tBodies[0].innerHTML = rows.length
-    ? rows.map(r => `<tr><td>${esc(r.name)}</td><td><span class="tag ${r.gama}">${LABEL[r.gama]}</span></td><td class="n">${r.qty}</td></tr>`).join('')
+  const mrows = [...map.values()].sort((a, b) => b.qty - a.qty || a.name.localeCompare(b.name));
+  $('by-model').tBodies[0].innerHTML = mrows.length
+    ? mrows.map(r => `<tr><td>${esc(r.name)}</td><td><span class="tag ${r.gama}">${LABEL[r.gama]}</span></td><td class="n">${r.qty}</td></tr>`).join('')
     : '<tr><td colspan="3" class="empty">Sin datos</td></tr>';
-  const top = rows.filter(r => r.qty > 0 && !r.name.startsWith('Acumulado')).slice(0, 5);
+  const top = mrows.filter(r => r.qty > 0 && !r.name.startsWith('Acumulado')).slice(0, 5);
   $('top').innerHTML = top.length ? top.map(r => `<li>${esc(r.name)} <span>${r.qty}</span></li>`).join('') : '<li class="empty">Aún no hay ventas este mes</li>';
 
   // listado de ventas
@@ -161,18 +189,36 @@ $('model-form').onsubmit = e => {
   state.models.push({ id: uid(), name, gama: $('model-gama').value });
   save(); $('model-name').value = ''; render();
 };
+function ruleRow(model = '', amounts = '') {
+  const names = [...new Set([...state.models.map(m => m.name), ...(model ? [model] : [])])];
+  const d = document.createElement('div'); d.className = 'rule';
+  d.innerHTML = `<select class="ag-input body" aria-label="Modelo">${names.map(n => `<option${n === model ? ' selected' : ''}>${esc(n)}</option>`).join('')}</select>
+    <input class="ag-input body" aria-label="Importes por unidad" placeholder="Ej. 50, 70, 100" value="${esc(amounts)}">
+    <button type="button" class="del" aria-label="Quitar" data-rule-del>✕</button>`;
+  $('unit-rules').appendChild(d);
+}
 function openGoals() {
-  const g = goalsFor(month);
+  const g = goalsFor(month), has = hasGoals(month);
   $('goal-title').textContent = 'Objetivos de ' + monthName(month);
-  GAMAS.forEach(x => { $('goal-' + x).value = hasGoals(month) ? g[x] : ''; $('inc-' + x).value = hasGoals(month) ? incOf(g, x) : ''; });
+  GAMAS.forEach(x => { $('goal-' + x).value = has ? g[x] : ''; $('inc-' + x).value = has ? incOf(g, x) : ''; $('max-' + x).value = has ? maxOf(g, x) : ''; });
+  $('unit-rules').innerHTML = '';
+  (g.unit || []).forEach(r => ruleRow(r.model, r.amounts.join(', ')));
   $('goal-dialog').showModal();
 }
 $('goals-form').onsubmit = e => {
   if (e.submitter && e.submitter.value !== 'ok') return;
-  state.goals[month] = Object.fromEntries(GAMAS.map(g => [g, Math.max(0, parseInt($('goal-' + g).value, 10) || 0)]));
-  state.goals[month].inc = Object.fromEntries(GAMAS.map(g => [g, Math.max(0, parseFloat($('inc-' + g).value) || 0)]));
+  const num = (id, f = parseFloat) => Math.max(0, f($(id).value) || 0);
+  const g = Object.fromEntries(GAMAS.map(x => [x, num('goal-' + x, v => parseInt(v, 10))]));
+  g.inc = Object.fromEntries(GAMAS.map(x => [x, num('inc-' + x)]));
+  g.max = Object.fromEntries(GAMAS.map(x => [x, Math.max(100, num('max-' + x) || 100)]));
+  g.unit = [...$('unit-rules').children].map(d => ({
+    model: d.querySelector('select').value,
+    amounts: d.querySelector('input').value.split(/[,;\s]+/).map(parseFloat).filter(n => n >= 0)
+  })).filter(r => r.model && r.amounts.length);
+  state.goals[month] = g;
   save(); render();
 };
+$('add-rule').onclick = () => ruleRow();
 $('goal-cancel').onclick = () => $('goal-dialog').close();
 $('history').onclick = e => { const tr = e.target.closest('tr[data-month]'); if (tr) { month = tr.dataset.month; setDefaultDate(); render(); } };
 $('models').onchange = e => {
@@ -194,6 +240,7 @@ document.addEventListener('visibilitychange', () => { if (!document.hidden) chec
 setInterval(checkNewMonth, 60000);
 document.addEventListener('click', e => {
   if (e.target.matches('[data-open-goals]')) return openGoals();
+  if (e.target.matches('[data-rule-del]')) return e.target.closest('.rule').remove();
   const sid = e.target.dataset && e.target.dataset.sale, mid = e.target.dataset && e.target.dataset.model;
   if (sid && confirm('¿Borrar esta venta?')) { state.sales = state.sales.filter(s => s.id !== sid); save(); render(); }
   if (mid) {
