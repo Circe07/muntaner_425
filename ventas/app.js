@@ -27,7 +27,9 @@ const NOV_SALES = [['PAD 4', 2], ['PAD 10', 13], ['PAD X8b', 1], ['H400 Smart', 
 // Plantilla de la marca (campaña noviembre 2026): sirve para rellenar el primer mes de cada cuenta nueva.
 const BRAND_TEMPLATE = { inc: NOV.goals.inc, max: NOV.goals.max, unit: NOV.goals.unit };
 // Cuenta nueva: modelos de la marca, sin ventas ni objetivos (cada persona pone los suyos).
-const freshState = () => ({ models: SEED.map(([name, gama]) => ({ id: uid(), name, gama })), sales: [], goals: {}, plans: {}, seedVersion: 8 });
+const freshState = () => ({ models: [], sales: [], goals: {}, plans: {}, seedVersion: 8 });
+const seedNames = new Set(SEED.map(([n]) => n.trim().toLowerCase()));
+const isSeedName = n => seedNames.has(String(n).trim().toLowerCase());
 const nowMonth = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`; };
 let state = load();
 let month = nowMonth();
@@ -80,6 +82,11 @@ function save() { persistLocal(); schedulePush(); }
 // ---------- planes de objetivos (el cálculo vive en plan.js) ----------
 const monthKeys = () => [...new Set([...Object.keys(state.plans || {}).filter(k => (state.plans[k] || []).length), ...Object.keys(state.goals || {})])].sort();
 // Planes del mes: una lista (el mensual y, si hay, los semanales). Si el mes no tiene lista, se usa el plan sencillo de tres gamas.
+const honorUser = () => state.models.some(m => isSeedName(m.name));
+function promptModels() {
+  const used = new Set(state.sales.map(s => norm(s.name)));
+  return [...new Set(state.models.map(m => m.name))].filter(n => !n.startsWith('Acumulado') && (used.has(norm(n)) || !isSeedName(n)));
+}
 function plansOf(m) {
   const p = state.plans && state.plans[m];
   if (Array.isArray(p)) return p;
@@ -235,6 +242,7 @@ function render() {
       }).join('')
     : '<li class="empty">No hay modelos todavía</li>';
   $('models-clear').hidden = !state.models.length;
+  $('models-honor').hidden = state.models.length > 0;
 }
 
 function shiftMonth(d) {
@@ -303,6 +311,10 @@ $('model-form').onsubmit = e => {
   state.models.push({ id: uid(), name, gama: $('model-gama').value });
   save(); $('model-name').value = ''; render();
 };
+$('models-honor').onclick = () => {
+  SEED.forEach(([name, gama]) => { if (!state.models.some(m => norm(m.name) === norm(name))) state.models.push({ id: uid(), name, gama }); });
+  save(); render();
+};
 $('models-clear').onclick = () => {
   if (!confirm('¿Vaciar la lista de modelos? Las ventas ya registradas se mantienen. Luego puedes añadir los tuyos o importarlos con tus objetivos.')) return;
   state.models = []; save(); render();
@@ -344,7 +356,7 @@ $('pd-go-edit').onclick = () => startReview(clone(plansOf(month)[0]), 'Ajusta la
 
 // paso IA
 $('pd-copy').onclick = async () => {
-  const text = Plan.buildPrompt({ models: state.models.map(m => m.name), monthLabel: monthName(month), today: todayStr() });
+  const text = Plan.buildPrompt({ models: promptModels(), monthLabel: monthName(month), today: todayStr() });
   try {
     await navigator.clipboard.writeText(text);
     $('pd-copy').textContent = '✓ Copiadas: pégalas en tu IA'; $('pd-fallback').hidden = true;
@@ -363,8 +375,25 @@ $('pd-review-btn').onclick = () => {
 };
 
 // paso revisar
+function renderGroups(plan) {
+  const box = $('pd-groups');
+  const inGroup = new Set(plan.groups.flatMap(g => g.models.map(norm)));
+  const loose = [];
+  const addLoose = sc => (sc.models || []).forEach(n => { if (!inGroup.has(norm(n)) && !loose.some(x => norm(x) === norm(n))) loose.push(n); });
+  plan.objectives.forEach(o => addLoose(o.scope)); plan.unit_incentives.forEach(r => addLoose(r.scope)); plan.commissions.forEach(c => addLoose(c.scope));
+  const withModels = plan.groups.filter(g => g.models.length);
+  if (!withModels.length && !loose.length) { box.hidden = true; return; }
+  const total = withModels.reduce((a, g) => a + g.models.length, 0) + loose.length;
+  const chips = list => list.map(n => `<span class="mchip">${esc(n)}</span>`).join('');
+  box.innerHTML = `<summary>Categorías y modelos detectados (${total} modelos)</summary>` +
+    withModels.map(g => `<div class="gline"><strong>${esc(g.name)}</strong> <small>${g.models.length}</small><div>${chips(g.models)}</div></div>`).join('') +
+    (loose.length ? `<div class="gline"><strong>Sin categoría</strong> <small>${loose.length}</small><div>${chips(loose)}</div></div>` : '') +
+    '<p class="hint footnote">Si algún modelo está en la categoría equivocada, lo cambias después en «Modelos».</p>';
+  box.hidden = false; box.open = total <= 25;
+}
 function startReview(plan, note, warnings, replaceDefault, ctx = {}) {
   draft = plan;
+  renderGroups(plan);
   reviewCtx = { editIndex: ctx.editIndex ?? null };
   const canMode = plansOf(month).length > 0 && reviewCtx.editIndex === null;
   $('pd-mode').hidden = !canMode;
@@ -437,7 +466,7 @@ function ruleRow(model = '', amounts = '') {
 }
 function lastConfig(m) {
   const prev = Object.keys(state.goals).filter(k => k < m && state.goals[k].inc).sort().pop();
-  return prev ? { ...state.goals[prev], from: prev } : { ...BRAND_TEMPLATE, from: null };
+  return prev ? { ...state.goals[prev], from: prev } : (honorUser() ? { ...BRAND_TEMPLATE, from: null } : { inc: {}, max: {}, unit: [], from: null });
 }
 const incOf = (g, x) => +((g.inc || {})[x]) || 0;
 function fillManual() {
@@ -445,8 +474,8 @@ function fillManual() {
   GAMAS.forEach(x => { $('goal-' + x).value = mine ? mine[x] : ''; $('inc-' + x).value = incOf(cfg, x) || ''; $('max-' + x).value = (cfg.max && cfg.max[x]) || ''; });
   $('unit-rules').innerHTML = '';
   (cfg.unit || []).forEach(r => ruleRow(r.model, r.amounts.join(', ')));
-  const imported = !!(state.plans && state.plans[month]);
-  $('goal-prefill').hidden = !!mine && !imported;
+  const imported = !!((state.plans && state.plans[month]) || []).length;
+  $('goal-prefill').hidden = (!!mine && !imported) || (!imported && !cfg.from && !honorUser());
   $('goal-prefill').textContent = imported ? 'Este mes tienes un plan importado: si guardas aquí, lo sustituye por este plan sencillo de tres gamas.'
     : cfg.from ? `Precargado con la configuración de ${monthName(cfg.from)}: ajusta lo que cambie y pon tus unidades.` : 'Precargado con la campaña de la marca (noviembre 2026): ajusta lo que cambie y pon tus unidades.';
 }
@@ -465,10 +494,18 @@ $('goals-form').onsubmit = e => {
 };
 $('add-rule').onclick = () => ruleRow();
 $('history').onclick = e => { const tr = e.target.closest('tr[data-month]'); if (tr) { month = tr.dataset.month; setDefaultDate(); render(); } };
+function assignModelGroup(m, groupId) {
+  const n = norm(m.name);
+  plansOf(month).forEach(p => p.groups.forEach(g => {
+    g.models = (g.models || []).filter(x => norm(x) !== n);
+    if (groupId && g.id === groupId && Array.isArray(state.plans[month])) g.models.push(m.name);
+  }));
+  m.gama = groupId;
+  state.sales.forEach(s => { if (s.modelId === m.id) s.gama = groupId; });
+}
 $('models').onchange = e => {
   const id = e.target.dataset.gama; if (!id) return;
-  const m = state.models.find(x => x.id === id); m.gama = e.target.value;
-  state.sales.forEach(s => { if (s.modelId === id) s.gama = m.gama; });
+  assignModelGroup(state.models.find(x => x.id === id), e.target.value);
   save(); render();
 };
 // Al abrir (o al cambiar de mes con la página abierta) pide el objetivo del mes en curso si falta.

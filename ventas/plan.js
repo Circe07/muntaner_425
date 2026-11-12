@@ -426,6 +426,23 @@
     incentivos_por_unidad: [{ modelos: ['Modelo K1'], importes: [6] }, { modelos: ['Modelo K2'], importes: [9] }]
   };
 
+  const EXAMPLE_E = {
+    version: 1, marca: 'Ejemplo E (objetivos separados por categoría de producto)',
+    grupos: [
+      { id: 'moviles', nombre: 'Móviles', modelos: ['Phone X1', 'Phone X2', 'Phone Lite'] },
+      { id: 'tablets', nombre: 'Tablets', modelos: ['Pad Z1', 'Pad Z2'] },
+      { id: 'relojes', nombre: 'Relojes', modelos: ['Watch W1', 'Band B2'] },
+      { id: 'portatiles', nombre: 'Portátiles', modelos: ['Book N14'] }
+    ],
+    objetivos: [
+      { id: 'moviles', nombre: 'Móviles', metrica: 'importe', ambito: { grupos: ['moviles'] }, meta: 20000, pago: { tipo: 'lineal', recompensa: 300, desde_pct: 80, tope_pct: 120 } },
+      { id: 'tablets', nombre: 'Tablets', metrica: 'unidades', ambito: { grupos: ['tablets'] }, meta: 12, pago: { tipo: 'lineal', recompensa: 150, desde_pct: 80, tope_pct: 120 } },
+      { id: 'relojes', nombre: 'Relojes', metrica: 'unidades', ambito: { grupos: ['relojes'] }, meta: 10, pago: { tipo: 'fijo', recompensa: 100, desde_pct: 100 } },
+      { id: 'portatiles', nombre: 'Portátiles', metrica: 'importe', ambito: { grupos: ['portatiles'] }, meta: 8000, pago: { tipo: 'lineal', recompensa: 200, desde_pct: 80, tope_pct: 100 } }
+    ],
+    notas: ['El texto no indica la categoría de «Pad Z2»: lo puse en Tablets por el nombre.', 'Los modelos de cada categoría son solo los que cita el texto.']
+  };
+
   function buildPrompt(opts) {
     const o = opts || {};
     const models = (o.models || []).slice(0, 80);
@@ -440,6 +457,7 @@
       '4. Si el texto mezcla varias marcas, meses o programas, usa solo lo que corresponda al mes indicado abajo y a un comercial de tienda. Ignora lo demás (condiciones legales, saludos…). Lo que dependa de otros departamentos o que no se pueda calcular (p. ej. «estrellas», asistencia) no lo incluyas: anótalo en "notas".',
       '5. Números sin símbolo ni separador de miles (40000, no "40.000 €"). Porcentajes sin el símbolo %.',
       '6. Si el texto es de un periodo concreto (una semana, una quincena, una campaña), pon "periodo" con fechas AAAA-MM-DD; la app solo contará las ventas de esas fechas. Si pone «esta semana», resuélvela con la fecha de hoy que te doy abajo (semana = lunes a domingo).',
+      '7. MODELOS Y CATEGORÍAS: saca los modelos DEL TEXTO. Usa SOLO modelos que aparezcan en el texto: NUNCA añadas modelos de memoria, de otra marca ni de ningún ejemplo de este mensaje. Si hay objetivos por categoría (móviles, tablets, relojes o wearables, portátiles, auriculares, TV, accesorios…), crea un grupo por cada categoría y coloca en su "modelos" TODOS los modelos que cite el texto, cada uno en la categoría que le corresponda según el tipo de producto (usa lo que sepas del producto: «Pad/Tab» = tablet, «Watch/Band/Fit» = reloj o pulsera, «Book/Laptop» = portátil, «Buds/TWS» = auriculares, un teléfono = móvil…). Si el texto ya trae una tabla modelo → categoría, respétala tal cual. Si no sabes a qué categoría pertenece un modelo, déjalo fuera de los grupos y apúntalo en "notas".',
       '',
       'FORMATO DEL JSON (todos los campos salvo "objetivos" o "incentivos_por_unidad" son opcionales)',
       '{',
@@ -497,9 +515,14 @@
       'EJEMPLO D (plan de una sola semana; solo cuentan las ventas de esas fechas):',
       J(EXAMPLE_D),
       '',
+      'EJEMPLO E (una marca con objetivos separados por categoría: cada modelo del texto va en su categoría):',
+      J(EXAMPLE_E),
+      '',
       'MES: ' + (o.monthLabel || ''),
       'HOY ES: ' + (o.today || ''),
-      models.length ? 'MIS MODELOS ACTUALES EN LA APP (usa estos nombres exactos si coinciden): ' + models.join(', ') : 'MIS MODELOS ACTUALES EN LA APP: (ninguno todavía)',
+      models.length
+        ? 'MODELOS QUE YA TENGO REGISTRADOS EN LA APP (solo para que escribas exactamente igual su nombre si aparecen en el texto; NO añadas ninguno que no esté en el texto): ' + models.join(', ')
+        : 'MODELOS YA REGISTRADOS EN LA APP: ninguno. Extrae todos los modelos del texto.',
       '',
       'RECUERDA: responde ya, sin preguntas, solo con el bloque ```json.',
       '',
@@ -508,7 +531,7 @@
     ].join('\n');
   }
 
-  const api = { LEGACY_GROUPS, normalizePlan, extractJson, fromLegacy, evaluate, evaluateAll, describePlan, buildPrompt, matchesScope, groupIdsOf, payFraction, inPeriod, periodText, norm, slug, eur, eur0, fmtV, EXAMPLE_A, EXAMPLE_B, EXAMPLE_C, EXAMPLE_D };
+  const api = { LEGACY_GROUPS, normalizePlan, extractJson, fromLegacy, evaluate, evaluateAll, describePlan, buildPrompt, matchesScope, groupIdsOf, payFraction, inPeriod, periodText, norm, slug, eur, eur0, fmtV, EXAMPLE_A, EXAMPLE_B, EXAMPLE_C, EXAMPLE_D, EXAMPLE_E };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   root.Plan = api;
 })(typeof window !== 'undefined' ? window : globalThis);

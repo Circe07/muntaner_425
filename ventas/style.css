@@ -241,3 +241,8 @@ a.ag-btn--primary,a.ag-btn--primary:visited{color:var(--ink-inverse)}
 .modes legend{padding:0 var(--space-2);font-size:13px;font-weight:600}
 .modes .check{margin:var(--space-2) 0}
 .modes input[type=radio]{margin-top:3px;width:18px;height:18px;flex:none}
+
+.gline{margin:var(--space-2) 0 var(--space-3)}
+.gline small{color:var(--ink-secondary);margin-left:var(--space-1)}
+.mchip{display:inline-block;margin:3px 4px 0 0;padding:1px 8px;border-radius:var(--radius-full);background:var(--surface-strong);border:1px solid var(--glass-edge);font-size:12px}
+#models-honor{margin:var(--space-3) var(--space-2) 0 0}
