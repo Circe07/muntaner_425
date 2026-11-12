@@ -168,3 +168,10 @@ td small{color:var(--ink-secondary);font-size:11px}
 a.ag-btn{text-decoration:none}
 a.ag-btn--primary,a.ag-btn--primary:visited{color:var(--ink-inverse)}
 #apk-link{margin-top:var(--space-2)}
+
+.passrow{display:flex;gap:var(--space-2);align-items:center}
+.passrow .ag-input{flex:1;min-width:0}
+.passrow .ag-btn{height:44px;padding:0 var(--space-3);flex:none;font-size:14px}
+.authrow{flex-direction:row-reverse;justify-content:flex-start}
+.authrow .ag-btn{flex:0 1 auto}
+@media(max-width:480px){.authrow{flex-direction:column-reverse}.authrow .ag-btn{width:100%}}

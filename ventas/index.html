@@ -145,11 +145,13 @@
 <dialog id="auth-dialog" class="ag-grain">
   <form id="auth-form">
     <h2 class="title3">Entrar</h2>
-    <p class="hint footnote">Tus ventas se guardan en tu cuenta y las ves desde cualquier dispositivo. Primera vez: pulsa “Crear cuenta”.</p>
-    <label>Correo <input class="ag-input body" type="email" id="auth-email" autocomplete="email" required></label>
-    <label>Contraseña (mínimo 8) <input class="ag-input body" type="password" id="auth-pass" minlength="8" autocomplete="current-password" required></label>
+    <p class="hint footnote">Tus ventas se guardan en tu cuenta y las ves desde cualquier dispositivo. Si ya tienes cuenta, usa el mismo correo y contraseña de siempre. “Crear cuenta” es solo la primera vez.</p>
+    <label>Correo <input class="ag-input body" type="email" id="auth-email" autocomplete="email" inputmode="email" autocapitalize="none" autocorrect="off" spellcheck="false" required></label>
+    <label>Contraseña (mínimo 8)
+      <span class="passrow"><input class="ag-input body" type="password" id="auth-pass" minlength="8" autocomplete="current-password" autocapitalize="none" autocorrect="off" spellcheck="false" required><button type="button" class="ag-btn ag-btn--glass" id="auth-eye" aria-label="Mostrar contraseña" aria-pressed="false">Ver</button></span>
+    </label>
     <p class="ag-hint ag-hint--danger footnote" id="auth-msg" role="alert" hidden></p>
-    <div class="row"><button class="ag-btn ag-btn--glass body" value="signup">Crear cuenta</button><button class="ag-btn ag-btn--primary body" value="login">Entrar</button></div>
+    <div class="row authrow"><button class="ag-btn ag-btn--primary body" value="login">Entrar</button><button class="ag-btn ag-btn--glass body" value="signup" formnovalidate>Crear cuenta</button></div>
   </form>
 </dialog>
 <div id="toast" class="ag-toast toast" role="status" aria-live="polite" hidden><p class="ag-toast__message body" id="toast-msg"></p><button type="button" class="ag-toast__action" id="toast-undo">Deshacer</button></div>

@@ -345,9 +345,9 @@ setDefaultDate(); render();
 const CFG = window.SUPABASE_CONFIG;
 let sb = null, session = null, rev = 0, pushTimer = null, pushing = false, dirty = false;
 function setStatus(text, s = '') { $('sync').textContent = text; $('sync-dot').dataset.s = s; $('sync-dot').title = text; }
-const traducir = m => /invalid login/i.test(m) ? 'Correo o contraseña incorrectos.'
+const traducir = m => /invalid login/i.test(m) ? 'Correo o contraseña incorrectos. Si ya creaste la cuenta, usa los mismos datos de siempre (pulsa “Ver” para comprobar la contraseña).'
   : /not confirmed/i.test(m) ? 'Falta confirmar el correo: abre el enlace que te hemos enviado.'
-  : /already registered|registro cerrado|database error/i.test(m) ? 'Esta app ya tiene su cuenta: usa “Entrar”.'
+  : /already registered|registro cerrado|database error/i.test(m) ? 'Ya existe una cuenta en esta app. Pulsa “Entrar” con tu correo y contraseña de siempre (son los mismos en la web y en la app).'
   : /password/i.test(m) ? 'La contraseña debe tener al menos 8 caracteres.'
   : /rate limit|too many/i.test(m) ? 'Demasiados intentos: espera unos minutos y prueba otra vez.'
   : 'No se pudo completar. Comprueba la conexión y vuelve a intentarlo.';
@@ -356,9 +356,10 @@ function askLogin() {
   return new Promise(resolve => {
     const dlg = $('auth-dialog'), msg = $('auth-msg');
     dlg.addEventListener('cancel', e => e.preventDefault());
+    $('auth-eye').onclick = () => { const p = $('auth-pass'), show = p.type === 'password'; p.type = show ? 'text' : 'password'; $('auth-eye').textContent = show ? 'Ocultar' : 'Ver'; $('auth-eye').setAttribute('aria-pressed', String(show)); };
     $('auth-form').onsubmit = async e => {
       e.preventDefault();
-      const kind = e.submitter && e.submitter.value, email = $('auth-email').value.trim(), password = $('auth-pass').value;
+      const kind = (e.submitter && e.submitter.value) || 'login', email = $('auth-email').value.trim(), password = $('auth-pass').value;
       msg.hidden = true; $('auth-form').querySelectorAll('button').forEach(b => b.disabled = true);
       const { data, error } = kind === 'signup' ? await sb.auth.signUp({ email, password }) : await sb.auth.signInWithPassword({ email, password });
       $('auth-form').querySelectorAll('button').forEach(b => b.disabled = false);
