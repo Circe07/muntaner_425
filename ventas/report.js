@@ -75,7 +75,44 @@
     return { empty: false, text: lines.join('\n'), total };
   }
 
-  const api = { TYPES, typeOf, deviceType, typeFromText, build };
+  // Formato "estilo tienda": el reporte diario que se manda por WhatsApp al grupo.
+  //   *Tienda* / *fecha* / *Total Marca:N* / «Telefonía:» y «Tablets:» siempre (aunque estén vacías) con líneas "cantidad-modelo",
+  //   otras categorías solo si hay ventas, «Sin stock:» (texto), «Devoluciones:» (aparte, sin restar) y «Feedback del día:» (texto).
+  // o: { date, to?, sales, typeOf(sale)->clave, nameOf(sale)->nombre a mostrar, title, brand, stock, feedback }
+  const SHOP_LABEL = { moviles: 'Telefonía', tablets: 'Tablets', relojes: 'Relojes', portatiles: 'Portátiles', auriculares: 'Auriculares', tv: 'TV', accesorios: 'Accesorios', otros: 'Otros' };
+  function buildStore(o) {
+    const end = o.to && o.to > o.date ? o.to : o.date, multi = end !== o.date;
+    const day = o.sales.filter(s => s && s.date >= o.date && s.date <= end && isFinite(s.qty));
+    const nameOf = o.nameOf || (s => s.name);
+    const sold = new Map(), back = [];                    // vendidas por tipo -> modelos (en orden de venta) | devueltas
+    const backMap = new Map();
+    let total = 0;
+    day.forEach(s => {
+      const name = nameOf(s);
+      if (s.qty > 0) {
+        const k = o.typeOf(s);
+        if (!sold.has(k)) sold.set(k, new Map());
+        const m = sold.get(k); m.set(name, (m.get(name) || 0) + s.qty); total += s.qty;
+      } else if (s.qty < 0) backMap.set(name, (backMap.get(name) || 0) + Math.abs(s.qty));
+    });
+    const brand = (o.brand || '').trim();
+    const L = [];
+    if ((o.title || '').trim()) L.push(`*${o.title.trim()}*`);
+    L.push(`*${multi ? dmy(o.date) + ' al ' + dmy(end) : dmy(o.date)}*`, '', '', `*Total${brand ? ' ' + brand : ''}:${total}*`, '');
+    TYPES.forEach(t => {
+      const items = sold.get(t.key);
+      if (!items && t.key !== 'moviles' && t.key !== 'tablets') return;       // Telefonía y Tablets salen siempre
+      L.push(`${SHOP_LABEL[t.key]}:`);
+      if (items) [...items.entries()].sort((a, b) => b[1] - a[1]).forEach(([name, q]) => L.push(`${q}-${name}`));
+      L.push('');
+    });
+    L.push('Sin stock:'); if ((o.stock || '').trim()) L.push(o.stock.trim()); L.push('');
+    L.push('Devoluciones:'); [...backMap.entries()].forEach(([name, q]) => L.push(`${q}-${name}`)); L.push('', '');
+    L.push('Feedback del día:'); if ((o.feedback || '').trim()) L.push(o.feedback.trim());
+    return { empty: false, text: L.join('\n'), total };
+  }
+
+  const api = { TYPES, SHOP_LABEL, typeOf, deviceType, typeFromText, build, buildStore };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   root.Report = api;
 })(typeof window !== 'undefined' ? window : globalThis);

@@ -255,6 +255,7 @@ a.ag-btn--primary,a.ag-btn--primary:visited{color:var(--ink-inverse)}
 main{padding-bottom:112px}
 #report-dialog{max-width:520px}
 .rp-controls{display:grid;gap:var(--space-3);margin-bottom:var(--space-3)}
+#rp-store,#rp-sum{display:grid;gap:var(--space-3)}#rp-store[hidden],#rp-sum[hidden]{display:none}#rp-store textarea{resize:vertical}
 .rp-text{width:100%;height:auto;min-height:96px;padding:var(--space-3);resize:vertical;font:13px/1.45 ui-monospace,Menlo,monospace;white-space:pre-wrap;margin-bottom:var(--space-3)}
 #rp-wa[aria-disabled=true]{opacity:.4;pointer-events:none}
 #rp-head:focus{outline:none}

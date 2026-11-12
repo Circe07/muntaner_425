@@ -234,9 +234,18 @@
   <div class="rp-controls">
     <label>Día (o desde) <input class="ag-input body" type="date" id="rp-date"></label>
     <label>Hasta (opcional: para un reporte de varios días) <input class="ag-input body" type="date" id="rp-to"></label>
-    <label>Nombre en el reporte (opcional) <input class="ag-input body" id="rp-title" maxlength="60" placeholder="Ej. Honor · Media Markt El Prat" autocomplete="off"></label>
-    <label class="check"><input type="checkbox" id="rp-month"> <span>Incluir el acumulado del mes</span></label>
-    <label class="check"><input type="checkbox" id="rp-emoji" checked> <span>Con emojis</span></label>
+    <label>Formato <select class="ag-input body" id="rp-style"><option value="tienda">Reporte de tienda (WhatsApp)</option><option value="resumen">Resumen con emojis</option></select></label>
+    <label>Tienda (sale arriba en negrita) <input class="ag-input body" id="rp-title" maxlength="60" placeholder="Ej. MM El Prat" autocomplete="off"></label>
+    <div id="rp-store">
+      <label>Marca para «Total …» <input class="ag-input body" id="rp-brand" maxlength="30" placeholder="Ej. Honor" autocomplete="off"></label>
+      <label class="check"><input type="checkbox" id="rp-prefix"> <span>Poner la marca delante de cada modelo</span></label>
+      <label>Sin stock (de este día) <textarea class="ag-input body" id="rp-stock" rows="2" placeholder="Ej. Honor 400 smart"></textarea></label>
+      <label>Feedback del día <textarea class="ag-input body" id="rp-feedback" rows="3" placeholder="Cómo ha ido el día…"></textarea></label>
+    </div>
+    <div id="rp-sum" hidden>
+      <label class="check"><input type="checkbox" id="rp-month"> <span>Incluir el acumulado del mes</span></label>
+      <label class="check"><input type="checkbox" id="rp-emoji" checked> <span>Con emojis</span></label>
+    </div>
   </div>
   <p class="hint footnote" id="rp-empty" hidden>Ese día no hay ventas registradas.</p>
   <textarea class="ag-input rp-text" id="rp-text" readonly rows="10" aria-label="Reporte listo para copiar" spellcheck="false"></textarea>
