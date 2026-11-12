@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Ventas del mes</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header>
+  <h1>Ventas del mes</h1>
+  <div class="month">
+    <button id="prev" aria-label="Mes anterior">‹</button>
+    <input type="month" id="month">
+    <button id="next" aria-label="Mes siguiente">›</button>
+  </div>
+</header>
+
+<main>
+  <section class="card" id="add-sale">
+    <h2>Añadir venta</h2>
+    <form id="sale-form">
+      <label>Fecha <input type="date" id="sale-date" required></label>
+      <label>Modelo <select id="sale-model" required></select></label>
+      <label>Unidades <input type="number" id="sale-qty" min="1" value="1" required></label>
+      <button class="primary">Añadir</button>
+    </form>
+    <p class="hint" id="no-models" hidden>Primero añade algún modelo en “Modelos”.</p>
+  </section>
+
+  <section class="card">
+    <h2>Objetivos y progreso</h2>
+    <div id="gamas" class="gamas"></div>
+    <details>
+      <summary>Editar objetivos de este mes (unidades por gama)</summary>
+      <form id="goals-form">
+        <label>Alta <input type="number" min="0" id="goal-alta"></label>
+        <label>Media <input type="number" min="0" id="goal-media"></label>
+        <label>Baja <input type="number" min="0" id="goal-baja"></label>
+        <button class="primary">Guardar</button>
+      </form>
+    </details>
+  </section>
+
+  <div class="two">
+    <section class="card">
+      <h2>Top modelos</h2>
+      <ol id="top" class="top"></ol>
+    </section>
+    <section class="card">
+      <h2>Ventas por modelo</h2>
+      <table id="by-model"><thead><tr><th>Modelo</th><th>Gama</th><th class="n">Uds.</th></tr></thead><tbody></tbody></table>
+    </section>
+  </div>
+
+  <section class="card">
+    <h2>Ventas registradas <span id="total" class="badge"></span></h2>
+    <table id="sales"><thead><tr><th>Fecha</th><th>Modelo</th><th>Gama</th><th class="n">Uds.</th><th></th></tr></thead><tbody></tbody></table>
+  </section>
+
+  <section class="card">
+    <h2>Modelos</h2>
+    <form id="model-form">
+      <label>Nombre <input id="model-name" required placeholder="Ej. Modelo X"></label>
+      <label>Gama
+        <select id="model-gama"><option value="alta">Alta</option><option value="media">Media</option><option value="baja">Baja</option></select>
+      </label>
+      <button class="primary">Añadir modelo</button>
+    </form>
+    <ul id="models" class="models"></ul>
+  </section>
+
+  <section class="card">
+    <h2>Copia de seguridad</h2>
+    <p class="hint">Los datos viven en este navegador. Descarga una copia de vez en cuando.</p>
+    <button id="export">Descargar copia</button>
+    <label class="file">Restaurar copia <input type="file" id="import" accept="application/json"></label>
+  </section>
+</main>
+<script src="app.js"></script>
+</body>
+</html>
