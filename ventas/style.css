@@ -175,3 +175,7 @@ a.ag-btn--primary,a.ag-btn--primary:visited{color:var(--ink-inverse)}
 .authrow{flex-direction:row-reverse;justify-content:flex-start}
 .authrow .ag-btn{flex:0 1 auto}
 @media(max-width:480px){.authrow{flex-direction:column-reverse}.authrow .ag-btn{width:100%}}
+
+.pwbox{margin:var(--space-3) 0;border:1px solid var(--glass-edge);border-radius:var(--radius-md);background:var(--surface);padding:var(--space-2) var(--space-3)}
+.pwbox summary{cursor:pointer;font-weight:600;padding:var(--space-2) 0;color:var(--accent)}
+.pwbox form{display:grid;gap:var(--space-3);padding:var(--space-2) 0 var(--space-3)}

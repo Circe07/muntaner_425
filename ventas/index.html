@@ -112,6 +112,16 @@
   <section class="card ag-card ag-grain">
     <h2 class="title3">Cuenta y copia de seguridad</h2>
     <p class="hint footnote">Estado: <strong id="sync">–</strong>. Tus datos se guardan en tu cuenta y los ves desde cualquier dispositivo.</p>
+    <details class="pwbox" id="pw-box">
+      <summary>Cambiar contraseña</summary>
+      <form id="pw-form">
+        <label>Nueva contraseña (mínimo 8)
+          <span class="passrow"><input class="ag-input body" type="password" id="pw-new" minlength="8" autocomplete="new-password" autocapitalize="none" autocorrect="off" spellcheck="false" required><button type="button" class="ag-btn ag-btn--glass" id="pw-eye" aria-label="Mostrar contraseña">Ver</button></span>
+        </label>
+        <p class="hint footnote" id="pw-msg" role="status" hidden></p>
+        <button class="ag-btn ag-btn--primary body">Guardar contraseña</button>
+      </form>
+    </details>
     <button class="ag-btn ag-btn--glass body" id="export">Descargar copia</button>
     <label class="file ag-btn ag-btn--glass body">Restaurar copia <input type="file" id="import" accept="application/json"></label>
     <button class="ag-btn ag-btn--glass body" id="share">Compartir enlace</button>

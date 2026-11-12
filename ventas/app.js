@@ -406,6 +406,19 @@ document.addEventListener('visibilitychange', () => {
   if (document.hidden) { if (dirty) push(); }
   else if (!dirty && !pushing && !document.querySelector('dialog[open]')) pull();
 });
+$('pw-eye').onclick = () => { const p = $('pw-new'), show = p.type === 'password'; p.type = show ? 'text' : 'password'; $('pw-eye').textContent = show ? 'Ocultar' : 'Ver'; };
+$('pw-form').onsubmit = async e => {
+  e.preventDefault();
+  const msg = $('pw-msg'), password = $('pw-new').value, btn = e.submitter;
+  const say = (t, ok) => { msg.textContent = t; msg.hidden = false; msg.style.color = ok ? 'var(--success)' : 'var(--danger)'; };
+  if (!sb || !session) return say('Primero inicia sesión.', false);
+  if (password.length < 8) return say('La contraseña debe tener al menos 8 caracteres.', false);
+  if (btn) btn.disabled = true;
+  const { error } = await sb.auth.updateUser({ password });
+  if (btn) btn.disabled = false;
+  if (error) return say(/different|same/i.test(error.message) ? 'Elige una contraseña distinta a la actual.' : /weak|short|at least/i.test(error.message) ? 'Esa contraseña es demasiado débil: usa una más larga.' : 'No se pudo cambiar. Cierra sesión, vuelve a entrar e inténtalo otra vez.', false);
+  $('pw-new').value = ''; say('Contraseña cambiada. Úsala la próxima vez que entres.', true);
+};
 $('logout').onclick = async () => {
   if (!sb || !confirm('¿Cerrar sesión en este dispositivo?')) return;
   await sb.auth.signOut(); try { localStorage.removeItem(KEY); } catch (e) {} location.reload();
