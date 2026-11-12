@@ -186,7 +186,7 @@ let sb = null, session = null, rev = 0, pushTimer = null, pushing = false, dirty
 function setStatus(text, s = '') { $('sync').textContent = text; $('sync-dot').dataset.s = s; $('sync-dot').title = text; }
 const traducir = m => /invalid login/i.test(m) ? 'Correo o contraseña incorrectos.'
   : /not confirmed/i.test(m) ? 'Falta confirmar el correo: abre el enlace que te hemos enviado.'
-  : /already registered|registro cerrado/i.test(m) ? 'Esta app ya tiene su cuenta: usa “Entrar”.'
+  : /already registered|registro cerrado|database error/i.test(m) ? 'Esta app ya tiene su cuenta: usa “Entrar”.'
   : /password/i.test(m) ? 'La contraseña debe tener al menos 8 caracteres.'
   : /rate limit|too many/i.test(m) ? 'Demasiados intentos: espera unos minutos y prueba otra vez.'
   : 'No se pudo completar. Comprueba la conexión y vuelve a intentarlo.';
@@ -327,7 +327,7 @@ let sb = null, session = null, rev = 0, pushTimer = null, pushing = false, dirty
 function setStatus(text, s = '') { $('sync').textContent = text; $('sync-dot').dataset.s = s; $('sync-dot').title = text; }
 const traducir = m => /invalid login/i.test(m) ? 'Correo o contraseña incorrectos.'
   : /not confirmed/i.test(m) ? 'Falta confirmar el correo: abre el enlace que te hemos enviado.'
-  : /already registered|registro cerrado/i.test(m) ? 'Esta app ya tiene su cuenta: usa “Entrar”.'
+  : /already registered|registro cerrado|database error/i.test(m) ? 'Esta app ya tiene su cuenta: usa “Entrar”.'
   : /password/i.test(m) ? 'La contraseña debe tener al menos 8 caracteres.'
   : /rate limit|too many/i.test(m) ? 'Demasiados intentos: espera unos minutos y prueba otra vez.'
   : 'No se pudo completar. Comprueba la conexión y vuelve a intentarlo.';
@@ -429,7 +429,7 @@ let sb = null, session = null, rev = 0, pushTimer = null, pushing = false, dirty
 function setStatus(text, s = '') { $('sync').textContent = text; $('sync-dot').dataset.s = s; $('sync-dot').title = text; }
 const traducir = m => /invalid login/i.test(m) ? 'Correo o contraseña incorrectos.'
   : /not confirmed/i.test(m) ? 'Falta confirmar el correo: abre el enlace que te hemos enviado.'
-  : /already registered|registro cerrado/i.test(m) ? 'Esta app ya tiene su cuenta: usa “Entrar”.'
+  : /already registered|registro cerrado|database error/i.test(m) ? 'Esta app ya tiene su cuenta: usa “Entrar”.'
   : /password/i.test(m) ? 'La contraseña debe tener al menos 8 caracteres.'
   : /rate limit|too many/i.test(m) ? 'Demasiados intentos: espera unos minutos y prueba otra vez.'
   : 'No se pudo completar. Comprueba la conexión y vuelve a intentarlo.';
