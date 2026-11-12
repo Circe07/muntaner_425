@@ -28,8 +28,8 @@ const NOV_SALES = [['PAD 4', 2], ['PAD 10', 13], ['PAD X8b', 1], ['H400 Smart', 
 const BRAND_TEMPLATE = { inc: NOV.goals.inc, max: NOV.goals.max, unit: NOV.goals.unit };
 // Cuenta nueva: modelos de la marca, sin ventas ni objetivos (cada persona pone los suyos).
 // Nombre comercial (para el reporte de WhatsApp) de los modelos de la marca de ejemplo.
-const SEED_ALIAS = { 'Magic V6': 'Honor Magic V6', 'M8 Pro': 'Honor Magic8 Pro', 'H600 Pro': 'Honor 600 Pro', 'H600': 'Honor 600', 'PAD 4': 'Honor Magic Pad 4', 'H400': 'Honor 400', 'M8 Lite': 'Honor Magic8 Lite', 'H600 Lite': 'Honor 600 Lite', 'PAD X9 max': 'Honor Pad X9 Max', 'PAD 10': 'Honor Pad 10', 'H600 Smart': 'Honor 600 Smart', 'PAD X8b': 'Honor Pad X8b', 'PAD X9a': 'Honor Pad X9a', 'H400 Smart': 'Honor 400 Smart', 'PAD X8a': 'Honor Pad X8a', 'X5c Plus': 'Honor X5c Plus' };
-const freshState = () => ({ models: [], sales: [], goals: {}, plans: {}, settings: {}, periods: {}, seedVersion: 9 });
+const SEED_ALIAS = { 'M8 Pro': 'Magic8 Pro', 'H600 Pro': '600 Pro', 'H600': '600', 'PAD 4': 'Magic Pad 4', 'H400': '400', 'M8 Lite': 'Magic8 Lite', 'H600 Lite': '600 Lite', 'PAD X9 max': 'Pad X9 Max', 'PAD 10': 'Pad 10', 'H600 Smart': '600 Smart', 'PAD X8b': 'Pad X8b', 'PAD X9a': 'Pad X9a', 'H400 Smart': '400 Smart', 'PAD X8a': 'Pad X8a' }; // sin la marca: la pone el ajuste «marca delante»
+const freshState = () => ({ models: [], sales: [], goals: {}, plans: {}, settings: {}, periods: {}, seedVersion: 10 });
 const seedNames = new Set(SEED.map(([n]) => n.trim().toLowerCase()));
 const isSeedName = n => seedNames.has(String(n).trim().toLowerCase());
 const nowMonth = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`; };
@@ -101,7 +101,9 @@ function migrate(s) {
   }
   Object.keys(s.plans).forEach(k => { if (!Array.isArray(s.plans[k])) s.plans[k] = s.plans[k] ? [s.plans[k]] : []; });
   if (v < 9) s.models.forEach(m => { const a = SEED_ALIAS[m.name]; if (a && !m.alias) m.alias = a; });
-  s.seedVersion = 9;
+  if (v === 9) s.models.forEach(m => { if (m.alias && /^Honor /.test(m.alias)) { const a = m.alias.slice(6).trim(); if (a && a !== m.name) m.alias = a; else delete m.alias; } });
+  if (v < 10 && !s.settings.reportPrefix) s.settings.reportPrefix = true;
+  s.seedVersion = 10;
   return s;
 }
 function persistLocal() { try { localStorage.setItem(KEY, JSON.stringify(state)); } catch (e) { alert('No se pudo guardar en el navegador.'); } }
@@ -702,7 +704,7 @@ function openReport() {
   $('rp-style').value = st.reportStyle === 'resumen' ? 'resumen' : 'tienda';
   $('rp-title').value = st.reportTitle || '';
   $('rp-brand').value = st.reportBrand != null ? st.reportBrand : (honorUser() ? 'Honor' : '');
-  $('rp-prefix').checked = !!st.reportPrefix;
+  $('rp-prefix').checked = st.reportPrefix !== false;
   $('rp-emoji').checked = st.reportEmoji !== false;
   $('rp-month').checked = !!st.reportMonth;
   loadReportNotes();
