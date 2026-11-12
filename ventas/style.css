@@ -228,3 +228,16 @@ a.ag-btn--primary,a.ag-btn--primary:visited{color:var(--ink-inverse)}
 
 .pd-notes{margin:var(--space-3) 0;padding:var(--space-3);border-radius:var(--radius-md);background:var(--accent-soft);border:1px solid var(--glass-edge);font-size:13px}
 .pd-notes ul{margin:var(--space-2) 0 0;padding-left:var(--space-5);display:grid;gap:4px}
+
+/* varios planes en un mes */
+.planbar{grid-column:1/-1;display:flex;justify-content:space-between;align-items:center;gap:var(--space-2);flex-wrap:wrap;padding:var(--space-2) var(--space-3);margin-top:var(--space-2);border-radius:var(--radius-md);background:var(--accent-soft)}
+.planbar:first-child{margin-top:0}
+.planbar small{color:var(--ink-secondary);margin-left:var(--space-1)}
+.planbtns{display:flex;gap:var(--space-2)}
+.pill{height:30px;padding:0 var(--space-3);border:1px solid var(--glass-edge);border-radius:var(--radius-full);background:var(--surface-strong);color:var(--accent);font:600 13px var(--font-sans);cursor:pointer}
+.pill:focus-visible{outline:2px solid var(--focus-ring);outline-offset:2px}
+.fx{font-weight:700;color:var(--success)}.fx.mid{color:var(--warning)}.fx.zero{color:var(--danger)}
+.modes{border:1px solid var(--glass-edge);border-radius:var(--radius-md);padding:var(--space-3);margin:var(--space-3) 0;background:var(--surface)}
+.modes legend{padding:0 var(--space-2);font-size:13px;font-weight:600}
+.modes .check{margin:var(--space-2) 0}
+.modes input[type=radio]{margin-top:3px;width:18px;height:18px;flex:none}

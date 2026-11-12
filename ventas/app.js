@@ -27,7 +27,7 @@ const NOV_SALES = [['PAD 4', 2], ['PAD 10', 13], ['PAD X8b', 1], ['H400 Smart', 
 // Plantilla de la marca (campaña noviembre 2026): sirve para rellenar el primer mes de cada cuenta nueva.
 const BRAND_TEMPLATE = { inc: NOV.goals.inc, max: NOV.goals.max, unit: NOV.goals.unit };
 // Cuenta nueva: modelos de la marca, sin ventas ni objetivos (cada persona pone los suyos).
-const freshState = () => ({ models: SEED.map(([name, gama]) => ({ id: uid(), name, gama })), sales: [], goals: {}, plans: {}, seedVersion: 7 });
+const freshState = () => ({ models: SEED.map(([name, gama]) => ({ id: uid(), name, gama })), sales: [], goals: {}, plans: {}, seedVersion: 8 });
 const nowMonth = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`; };
 let state = load();
 let month = nowMonth();
@@ -70,26 +70,39 @@ function migrate(s) {
       });
     }
   }
-  s.seedVersion = 7;
+  Object.keys(s.plans).forEach(k => { if (!Array.isArray(s.plans[k])) s.plans[k] = s.plans[k] ? [s.plans[k]] : []; });
+  s.seedVersion = 8;
   return s;
 }
 function persistLocal() { try { localStorage.setItem(KEY, JSON.stringify(state)); } catch (e) { alert('No se pudo guardar en el navegador.'); } }
 function save() { persistLocal(); schedulePush(); }
 
 // ---------- planes de objetivos (el cálculo vive en plan.js) ----------
-const monthKeys = () => [...new Set([...Object.keys(state.plans || {}), ...Object.keys(state.goals || {})])].sort();
-// Plan del mes: el estándar (IA / revisado) o, si no hay, el sencillo de tres gamas convertido.
-function planFor(m) {
-  if (state.plans && state.plans[m]) return state.plans[m];
-  if (state.goals[m]) return Plan.fromLegacy(state.goals[m]);
+const monthKeys = () => [...new Set([...Object.keys(state.plans || {}).filter(k => (state.plans[k] || []).length), ...Object.keys(state.goals || {})])].sort();
+// Planes del mes: una lista (el mensual y, si hay, los semanales). Si el mes no tiene lista, se usa el plan sencillo de tres gamas.
+function plansOf(m) {
+  const p = state.plans && state.plans[m];
+  if (Array.isArray(p)) return p;
+  if (state.goals[m]) return [Plan.fromLegacy(state.goals[m])];
+  return [];
+}
+const hasGoals = m => plansOf(m).length > 0;
+const evalMonth = (m, sales) => Plan.evaluateAll(plansOf(m), sales);
+// último mes anterior con un plan mensual (sin fechas propias) que se pueda repetir
+function previousPlan(m) {
+  for (const k of monthKeys().filter(x => x < m).reverse()) { const p = plansOf(k).find(x => !x.period); if (p) return { month: k, plan: p }; }
   return null;
 }
-const hasGoals = m => !!planFor(m);
-const previousPlan = m => { const k = monthKeys().filter(x => x < m).pop(); return k ? { month: k, plan: planFor(k) } : null; };
-const currentGroups = () => { const p = planFor(month); return p && p.groups.length ? p.groups : Plan.LEGACY_GROUPS; };
+function currentGroups() {
+  const seen = new Map();
+  plansOf(month).forEach(p => p.groups.forEach(g => { if (!seen.has(g.id)) seen.set(g.id, g); }));
+  return seen.size ? [...seen.values()] : Plan.LEGACY_GROUPS;
+}
 function groupOfName(name, gama) {
-  const gs = currentGroups(), p = planFor(month);
-  const id = (p ? Plan.groupIdsOf(p, { name, gama })[0] : null) || gama;
+  const gs = currentGroups();
+  let id = null;
+  for (const p of plansOf(month)) { id = Plan.groupIdsOf(p, { name, gama })[0]; if (id) break; }
+  id = id || gama;
   const g = gs.find(x => x.id === id);
   return g ? { name: g.name, i: gs.indexOf(g) } : { name: LABEL[gama] || gama || '', i: 0 };
 }
@@ -119,7 +132,7 @@ function objectiveCard(o, ev, idx) {
     else detail = `${p.start_pct}%: ${eur(o.payAtStart)} · 100%: ${eur(p.reward)}` + (p.cap_pct > 100 ? ` · tope ${p.cap_pct}% (${f(Math.ceil(o.target * p.cap_pct / 100 - 1e-9))}${unit}): ${eur(p.reward * p.cap_pct / 100)}` : '');
   }
   const notes = [
-    ...o.requires.map(id => ev.objectives.find(x => x.id === id)).filter(Boolean).map(r => `<div class="note ${r.reached ? 'ok' : 'no'}">${r.reached ? '✓' : '✗'} Requiere llegar al ${r.payout.start_pct}% de «${esc(r.name)}»</div>`),
+    ...o.reqs.map(r => `<div class="note ${r.ok ? 'ok' : 'no'}">${r.ok ? '✓' : '✗'} Requiere llegar al ${r.need}% de «${esc(r.name)}»</div>`),
     o.pool ? `<div class="note">Alternativa ${esc(o.pool.toUpperCase())}: ${o.poolLoser ? 'ahora cuenta el otro objetivo' : 'cuenta el que más paga'}</div>` : '',
     o.missing ? `<div class="note no">⚠ ${o.missing} venta${o.missing > 1 ? 's' : ''} sin importe: no cuenta${o.missing > 1 ? 'n' : ''}</div>` : ''
   ].join('');
@@ -128,7 +141,7 @@ function objectiveCard(o, ev, idx) {
       <div class="big">${f(o.value)} <small>/ ${f(o.target)}${unit}</small></div>
       <div class="bar"><i style="width:${fill}%"></i>${markHtml}</div>
       <div class="miss">${miss}</div>
-      ${p.reward > 0 ? `<div class="inc">Incentivo ahora: <strong>${eur(o.payNow)}</strong><br>${detail}</div>` : ''}
+      ${p.reward > 0 ? `<div class="inc">Incentivo ahora: <strong>${eur(o.payNow)}</strong><br>${detail}</div>` : `<div class="note">${o.target ? 'Meta de referencia: sirve para calcular otros premios.' : '⚠ Falta tu meta: pónla en «Ajustar».'}</div>`}
       ${notes}
     </div>`;
 }
@@ -136,8 +149,9 @@ function objectiveCard(o, ev, idx) {
 function render() {
   $('month').value = month;
   $('month-label').textContent = monthName(month);
-  const plan = planFor(month), sales = monthSales();
-  const ev = plan ? Plan.evaluate(plan, sales) : null;
+  const plans = plansOf(month), sales = monthSales();
+  const ev = plans.length ? evalMonth(month, sales) : null;
+  const plan = plans.length > 0;
   const gs = currentGroups();
 
   // formulario de venta: importe solo si hay objetivos o comisiones en dinero
@@ -152,20 +166,25 @@ function render() {
   // objetivos
   $('goal-banner').hidden = !!plan;
   $('edit-goals').hidden = !plan;
-  $('gamas').innerHTML = ev ? ev.objectives.map((o, i) => objectiveCard(o, ev, i)).join('') : '';
+  $('gamas').innerHTML = ev ? ev.entries.map((en, pi) => {
+    const head = (plans.length > 1 || en.plan.name || en.plan.period)
+      ? `<div class="planbar"><div><strong>${esc(en.plan.name || 'Plan ' + (pi + 1))}</strong>${en.plan.period ? ` <small>${esc(Plan.periodText(en.plan.period))}</small>` : ''}</div><span class="planbtns"><button type="button" class="pill" data-plan-edit="${pi}">Ajustar</button><button type="button" class="pill" data-plan-del="${pi}">Quitar</button></span></div>` : '';
+    return head + en.ev.objectives.map((o, i) => objectiveCard(o, en.ev, i)).join('');
+  }).join('') : '';
   $('plan-howto').hidden = !plan;
-  $('plan-lines').innerHTML = plan ? Plan.describePlan(plan).map(l => `<li>${esc(l)}</li>`).join('') : '';
+  $('plan-lines').innerHTML = plan ? plans.flatMap(p => Plan.describePlan(p)).map(l => `<li>${esc(l)}</li>`).join('') : '';
 
   // por unidad y comisiones
-  const rows = ev ? ev.unitRows : [], coms = ev ? ev.comRows : [];
+  const rows = ev ? ev.entries.flatMap(e => e.ev.unitRows) : [], coms = ev ? ev.entries.flatMap(e => e.ev.comRows) : [];
   $('unit-card').hidden = !(rows.length || coms.length);
   $('unit-table').tBodies[0].innerHTML =
-    rows.map(r => `<tr><td>${esc(r.label)}</td><td class="n">${r.n}</td><td class="n c-imp">${r.amounts.map(eur).join(' / ')}</td><td class="n">${eur(r.next)}</td><td class="n"><strong>${eur(r.pay)}</strong></td></tr>`).join('') +
+    rows.map(r => `<tr><td>${esc(r.label)}${r.rule.condition ? ` <small class="fx${r.factor === 100 ? '' : r.factor ? ' mid' : ' zero'}">×${r.factor}%</small>` : ''}</td><td class="n">${r.n}</td><td class="n c-imp">${r.rule.mode === 'retro' ? r.rule.tiers.map(t => `${eur(t.amount)} desde ${t.from}`).join(' / ') : r.rule.amounts.map(eur).join(' / ')}</td><td class="n">${eur(r.next)}</td><td class="n"><strong>${eur(r.pay)}</strong></td></tr>`).join('') +
     coms.map(r => `<tr><td>${esc(r.name)} <small>(${String(r.percent).replace('.', ',')}%)</small></td><td class="n">${eur0(r.revenue)}</td><td class="n c-imp">${String(r.percent).replace('.', ',')}% del importe</td><td class="n">–</td><td class="n"><strong>${eur(r.pay)}</strong></td></tr>`).join('');
   $('unit-total').textContent = ev ? eur(ev.units + ev.commissions) : '';
   const lump = sales.filter(s => !s.modelId).reduce((a, s) => a + s.qty, 0);
-  $('unit-warn').hidden = !(rows.length && lump);
-  $('unit-warn').textContent = `${lump} uds. del acumulado sin desglosar no cuentan para estos incentivos. Añádelas como ventas por modelo y borra el acumulado.`;
+  const noTarget = ev ? ev.entries.some(e => e.ev.unitRows.some(r => r.rule.condition && r.condPct === 0) && e.ev.objectives.some(o => !(o.target > 0))) : false;
+  const warnTxt = [rows.length && lump ? `${lump} uds. del acumulado sin desglosar no cuentan para estos incentivos. Añádelas como ventas por modelo y borra el acumulado.` : '', noTarget ? 'Estos premios dependen de tu meta y aún no la has puesto: pulsa «Ajustar» en el plan.' : ''].filter(Boolean).join(' ');
+  $('unit-warn').hidden = !warnTxt; $('unit-warn').textContent = warnTxt;
 
   // total de incentivo
   $('inc-total').hidden = !(ev && (ev.objectivesMax || rows.length || coms.length));
@@ -179,8 +198,8 @@ function render() {
   // historial
   const ms = new Set([...monthKeys(), ...state.sales.map(s => s.date.slice(0, 7)), nowMonth()]);
   $('history').tBodies[0].innerHTML = [...ms].sort().reverse().map(m => {
-    const pl = planFor(m), e2 = pl ? Plan.evaluate(pl, salesOf(m)) : null;
-    const chips = e2 ? e2.objectives.slice(0, 6).map(o => `<span class="chip">${esc(o.name)} <b>${o.target ? Math.round(o.pct) + '%' : '–'}</b></span>`).join('') : '<span class="empty">Sin objetivos</span>';
+    const e2 = hasGoals(m) ? evalMonth(m, salesOf(m)) : null;
+    const chips = e2 ? e2.entries.flatMap(en => en.ev.objectives).filter(o => o.target > 0).slice(0, 6).map(o => `<span class="chip">${esc(o.name)} <b>${Math.round(o.pct)}%</b></span>`).join('') || '<span class="empty">Solo incentivos por unidad</span>' : '<span class="empty">Sin objetivos</span>';
     return `<tr data-month="${m}" class="${m === month ? 'cur' : ''}"><td class="nw">${monthShort(m)}</td><td>${chips}</td><td class="nw">${e2 ? eur(e2.total) : '–'}</td></tr>`;
   }).join('');
 
@@ -206,12 +225,12 @@ function render() {
     : '<tr><td colspan="5" class="empty">Sin ventas este mes</td></tr>';
 
   // gestión de modelos y grupos
-  const gOpts = sel => gs.map(g => `<option value="${esc(g.id)}"${g.id === sel ? ' selected' : ''}>${esc(g.name)}</option>`).join('');
+  const gOpts = sel => gs.map(g => `<option value="${esc(g.id)}"${g.id === sel ? ' selected' : ''}>${esc(g.name)}</option>`).join('') + `<option value=""${sel === '' ? ' selected' : ''}>Sin grupo</option>`;
   const prevGroup = $('model-gama').value;
-  $('model-gama').innerHTML = gOpts(gs.some(g => g.id === prevGroup) ? prevGroup : gs[0].id);
+  $('model-gama').innerHTML = gOpts(gs.some(g => g.id === prevGroup) || prevGroup === '' ? prevGroup : gs[0].id);
   $('models').innerHTML = state.models.length
     ? state.models.map(m => {
-        const extra = gs.some(g => g.id === m.gama) ? '' : `<option value="${esc(m.gama)}" selected>${esc(LABEL[m.gama] || m.gama)}</option>`;
+        const extra = (!m.gama || gs.some(g => g.id === m.gama)) ? '' : `<option value="${esc(m.gama)}" selected>${esc(LABEL[m.gama] || m.gama)}</option>`;
         return `<li><span>${esc(m.name)}</span><span><select class="ag-input footnote" data-gama="${m.id}">${extra}${gOpts(m.gama)}</select> <button class="del" aria-label="Quitar modelo" data-model="${m.id}" title="Quitar modelo">✕</button></span></li>`;
       }).join('')
     : '<li class="empty">No hay modelos todavía</li>';
@@ -290,7 +309,8 @@ $('models-clear').onclick = () => {
 };
 
 // ---------- objetivos del mes: diálogo con 4 pasos ----------
-let draft = null;
+let draft = null, aiAdd = false, reviewCtx = { editIndex: null };
+const todayStr = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
 const STEPS = ['start', 'ia', 'review', 'manual'];
 function showStep(s) {
   STEPS.forEach(x => { $('pd-' + x).hidden = x !== s; });
@@ -300,7 +320,9 @@ function openPlanDialog(step) {
   const dlg = $('plan-dialog');
   $('pd-title').textContent = 'Objetivos de ' + monthName(month);
   const prev = previousPlan(month);
-  $('pd-go-edit').hidden = !hasGoals(month);
+  const nPlans = plansOf(month).length;
+  $('pd-go-edit').hidden = nPlans !== 1;
+  $('pd-go-add').hidden = nPlans < 1;
   $('pd-go-repeat').hidden = !prev;
   if (prev) $('pd-repeat-desc').textContent = `Copia el plan de ${monthName(prev.month)} y ajustas las metas.`;
   $('pd-errors').hidden = true; $('pd-fallback').hidden = true; $('pd-copy').textContent = 'Copiar instrucciones';
@@ -311,17 +333,18 @@ function openPlanDialog(step) {
 const closePlanDialog = () => { if ($('plan-dialog').open) $('plan-dialog').close(); };
 $('pd-x').onclick = closePlanDialog;
 document.querySelectorAll('[data-back]').forEach(b => b.onclick = () => showStep('start'));
-$('pd-go-ia').onclick = () => showStep('ia');
+$('pd-go-ia').onclick = () => { aiAdd = false; showStep('ia'); };
+$('pd-go-add').onclick = () => { aiAdd = true; showStep('ia'); };
 $('pd-go-manual').onclick = () => { fillManual(); showStep('manual'); };
 $('pd-go-repeat').onclick = () => {
   const prev = previousPlan(month); if (!prev) return;
-  startReview(clone(prev.plan), `Plan copiado de ${monthName(prev.month)}: ajusta las metas y recompensas de este mes.`, [], false);
+  startReview(clone(prev.plan), `Plan copiado de ${monthName(prev.month)}: ajusta las metas y recompensas de este mes.`, [], false, { editIndex: null, addDefault: false });
 };
-$('pd-go-edit').onclick = () => startReview(clone(planFor(month)), 'Ajusta las metas y recompensas de este mes.', [], false);
+$('pd-go-edit').onclick = () => startReview(clone(plansOf(month)[0]), 'Ajusta las metas y recompensas de este mes.', [], false, { editIndex: 0 });
 
 // paso IA
 $('pd-copy').onclick = async () => {
-  const text = Plan.buildPrompt({ models: state.models.map(m => m.name), monthLabel: monthName(month) });
+  const text = Plan.buildPrompt({ models: state.models.map(m => m.name), monthLabel: monthName(month), today: todayStr() });
   try {
     await navigator.clipboard.writeText(text);
     $('pd-copy').textContent = '✓ Copiadas: pégalas en tu IA'; $('pd-fallback').hidden = true;
@@ -336,23 +359,28 @@ $('pd-review-btn').onclick = () => {
   const list = $('pd-errors');
   if (r.errors.length) { list.innerHTML = r.errors.map(x => `<li>${esc(x)}</li>`).join(''); list.hidden = false; return; }
   list.hidden = true;
-  startReview(r.plan, 'Revisa que todo coincide con tu comunicado. Si algo no cuadra, puedes ajustar la meta o la recompensa aquí, o volver y repetir con tu IA.', r.warnings, state.sales.length === 0);
+  startReview(r.plan, 'Revisa que todo coincide con tu comunicado. Si algo no cuadra, puedes ajustar la meta o la recompensa aquí, o volver y repetir con tu IA.', r.warnings, state.sales.length === 0, { editIndex: null, addDefault: aiAdd || !!r.plan.period });
 };
 
 // paso revisar
-function startReview(plan, note, warnings, replaceDefault) {
+function startReview(plan, note, warnings, replaceDefault, ctx = {}) {
   draft = plan;
+  reviewCtx = { editIndex: ctx.editIndex ?? null };
+  const canMode = plansOf(month).length > 0 && reviewCtx.editIndex === null;
+  $('pd-mode').hidden = !canMode;
+  if (canMode) document.querySelector(`input[name=pdmode][value=${(ctx.addDefault ?? !!plan.period) ? 'add' : 'replace'}]`).checked = true;
   $('pd-note').textContent = note;
   const warn = $('pd-warnings');
   warn.innerHTML = warnings.map(x => `<li>${esc(x)}</li>`).join(''); warn.hidden = !warnings.length;
   const notes = plan.notes || [];
   $('pd-notes-list').innerHTML = notes.map(x => `<li>${esc(x)}</li>`).join(''); $('pd-notes').hidden = !notes.length;
-  const hasModels = plan.groups.some(g => g.models.length);
+  const hasModels = plan.groups.some(g => g.models.length) || plan.unit_incentives.some(r => (r.scope.models || []).length);
   $('pd-models-wrap').hidden = !hasModels;
   $('pd-models').checked = hasModels && replaceDefault;
-  $('pd-edit').innerHTML = plan.objectives.map((o, i) => `<div class="orow"><div class="oname"><strong>${esc(o.name)}</strong><small>${o.metric === 'revenue' ? 'Meta en dinero' : 'Meta en unidades'}</small></div>
-      <label>Meta${o.metric === 'revenue' ? ' (€)' : ''}<input class="ag-input body" type="number" min="0" step="any" inputmode="decimal" data-oi="${i}" data-f="target" value="${o.target}"></label>
-      <label>Recompensa (€)<input class="ag-input body" type="number" min="0" step="any" inputmode="decimal" data-oi="${i}" data-f="reward" value="${o.payout.reward}"></label></div>`).join('');
+  $('pd-edit').innerHTML = plan.objectives.map((o, i) => `<div class="orow"><div class="oname"><strong>${esc(o.name)}</strong><small>${o.metric === 'revenue' ? 'Meta en dinero' : 'Meta en unidades'}${o.payout.reward > 0 ? '' : ' · de referencia'}</small></div>
+      <label>Meta${o.metric === 'revenue' ? ' (€)' : ''}<input class="ag-input body" type="number" min="0" step="any" inputmode="decimal" data-oi="${i}" data-f="target" value="${o.target || ''}" placeholder="Tu meta"></label>
+      ${o.payout.reward > 0 ? `<label>Recompensa (€)<input class="ag-input body" type="number" min="0" step="any" inputmode="decimal" data-oi="${i}" data-f="reward" value="${o.payout.reward}"></label>` : ''}</div>`).join('');
+  $('pd-lines-box').open = Plan.describePlan(plan).length <= 8;
   paintLines();
   showStep('review');
   const dlg = $('plan-dialog'); if (!dlg.open) { $('pd-title').textContent = 'Objetivos de ' + monthName(month); dlg.showModal(); }
@@ -370,23 +398,32 @@ $('pd-apply').onclick = () => {
   readEdits();
   const bad = draft.objectives.find(o => !(o.target > 0));
   if (bad) { alert(`La meta de «${bad.name}» tiene que ser mayor que 0.`); return; }
-  commitPlan(draft, $('pd-models').checked);
+  const mode = reviewCtx.editIndex !== null ? 'edit' : ($('pd-mode').hidden ? 'replace' : document.querySelector('input[name=pdmode]:checked').value);
+  commitPlan(draft, $('pd-models').checked, mode, reviewCtx.editIndex);
 };
-function commitPlan(plan, replaceModels) {
-  state.plans[month] = clone(plan);
-  const named = new Set();
-  plan.groups.forEach(g => g.models.forEach(name => {
-    named.add(norm(name));
-    const m = state.models.find(x => norm(x.name) === norm(name));
-    if (m) { m.gama = g.id; state.sales.forEach(s => { if (s.modelId === m.id) s.gama = g.id; }); }
-    else state.models.push({ id: uid(), name, gama: g.id });
-  }));
+function commitPlan(plan, replaceModels, mode, editIndex) {
+  const base = plansOf(month).map(clone);   // incluye el plan sencillo convertido si el mes aún no tenía lista
+  let list;
+  if (mode === 'edit') { list = base; list[editIndex] = clone(plan); }
+  else if (mode === 'add') list = [...base, clone(plan)];
+  else list = [clone(plan)];
+  state.plans[month] = list;
+  // modelos del plan: los de los grupos y los que citan objetivos, incentivos y comisiones (para poder registrar sus ventas)
+  const names = new Map();
+  plan.groups.forEach(g => g.models.forEach(n => names.set(norm(n), { name: n, gama: g.id })));
+  const addScope = sc => (sc.models || []).forEach(n => { if (!names.has(norm(n))) names.set(norm(n), { name: n, gama: '' }); });
+  plan.objectives.forEach(o => addScope(o.scope)); plan.unit_incentives.forEach(r => addScope(r.scope)); plan.commissions.forEach(c => addScope(c.scope));
+  names.forEach(({ name, gama }, k) => {
+    const m = state.models.find(x => norm(x.name) === k);
+    if (m) { if (gama) { m.gama = gama; state.sales.forEach(s => { if (s.modelId === m.id) s.gama = gama; }); } }
+    else state.models.push({ id: uid(), name, gama });
+  });
   if (replaceModels) {
     const used = new Set(state.sales.map(s => norm(s.name)));
-    state.models = state.models.filter(m => named.has(norm(m.name)) || used.has(norm(m.name)));
+    state.models = state.models.filter(m => names.has(norm(m.name)) || used.has(norm(m.name)));
   }
   save(); closePlanDialog(); render();
-  showToast('Objetivos guardados', null);
+  showToast(mode === 'add' ? 'Plan añadido al mes' : 'Objetivos guardados', null);
 }
 
 // paso manual (sencillo, tres gamas)
@@ -449,6 +486,13 @@ setInterval(checkNewMonth, 60000);
 document.addEventListener('click', e => {
   if (e.target.matches('[data-open-goals]')) return openPlanDialog('start');
   if (e.target.matches('[data-rule-del]')) return e.target.closest('.rule').remove();
+  const pe = e.target.dataset && e.target.dataset.planEdit, pd = e.target.dataset && e.target.dataset.planDel;
+  if (pe !== undefined) { const p = plansOf(month)[+pe]; if (p) startReview(clone(p), `Ajusta las metas y recompensas de «${p.name || 'este plan'}».`, [], false, { editIndex: +pe }); return; }
+  if (pd !== undefined) {
+    const list = plansOf(month).map(clone), p = list[+pd];
+    if (p && confirm(`¿Quitar «${p.name || 'este plan'}» de ${monthName(month)}? Las ventas ya registradas se mantienen.`)) { list.splice(+pd, 1); state.plans[month] = list; save(); render(); }
+    return;
+  }
   const sid = e.target.dataset && e.target.dataset.sale, mid = e.target.dataset && e.target.dataset.model;
   if (sid) {
     const s = state.sales.find(x => x.id === sid);

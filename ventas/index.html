@@ -139,6 +139,7 @@
     <div class="choices">
       <button type="button" class="choice choice--main" id="pd-go-ia"><strong>Con mi IA (recomendado)</strong><span>Pegas el correo de objetivos en Gemini, ChatGPT o la IA que uses y la app lee el resultado. Vale para cualquier marca: unidades, dinero, categorías, escalones…</span></button>
       <button type="button" class="choice" id="pd-go-repeat" hidden><strong>Repetir el mes anterior</strong><span id="pd-repeat-desc"></span></button>
+      <button type="button" class="choice" id="pd-go-add" hidden><strong>Añadir otro plan al mes</strong><span>Para un plan semanal o de una campaña concreta (cada uno con sus fechas): se suma a lo que ya tienes.</span></button>
       <button type="button" class="choice" id="pd-go-edit" hidden><strong>Ajustar los objetivos de este mes</strong><span>Cambia las metas y las recompensas del plan actual.</span></button>
       <button type="button" class="choice" id="pd-go-manual"><strong>A mano (sencillo)</strong><span>Tres gamas —alta, media y baja— con unidades, incentivo y tope.</span></button>
     </div>
@@ -163,8 +164,11 @@
     <div class="pd-notes" id="pd-notes" hidden><strong>Supuestos de tu IA (compruébalos)</strong><ul id="pd-notes-list"></ul></div>
     <ul class="pd-warnings" id="pd-warnings" hidden></ul>
     <div id="pd-edit" class="oedit"></div>
-    <h3 class="subtitle">Así se calculará</h3>
-    <ul class="plan-lines" id="pd-lines"></ul>
+    <details class="howto" id="pd-lines-box" open><summary>Así se calculará</summary><ul class="plan-lines" id="pd-lines"></ul></details>
+    <fieldset class="modes" id="pd-mode" hidden><legend>Este mes ya tiene objetivos. ¿Qué hago con este plan?</legend>
+      <label class="check"><input type="radio" name="pdmode" value="add"> <span>Añadirlo como un plan más (p. ej. el de esta semana)</span></label>
+      <label class="check"><input type="radio" name="pdmode" value="replace"> <span>Reemplazar los planes de este mes</span></label>
+    </fieldset>
     <label class="check" id="pd-models-wrap" hidden><input type="checkbox" id="pd-models"> <span>Sustituir mi lista de modelos por la de este plan (recomendado si cambias de marca)</span></label>
     <div class="row"><button type="button" class="ag-btn ag-btn--glass body" data-back>Volver</button><button type="button" class="ag-btn ag-btn--primary body" id="pd-apply">Aplicar objetivos</button></div>
   </section>
