@@ -23,11 +23,22 @@
 <main>
   <section class="card ag-card ag-grain" id="add-sale">
     <h2 class="title3">Añadir venta</h2>
-    <form id="sale-form">
+    <form id="sale-form" novalidate>
+      <div class="seg" role="group" aria-label="Tipo de movimiento">
+        <button type="button" class="seg-btn" data-kind="venta" aria-pressed="true">Venta</button>
+        <button type="button" class="seg-btn" data-kind="devolucion" aria-pressed="false">Devolución</button>
+      </div>
       <label>Fecha <input class="ag-input body" type="date" id="sale-date" required></label>
-      <label>Modelo <select class="ag-input body" id="sale-model" required></select></label>
-      <label>Unidades <input class="ag-input body" type="number" id="sale-qty" min="1" value="1" required></label>
-      <button class="ag-btn ag-btn--primary body">Añadir</button>
+      <label>Modelo <select class="ag-input body" id="sale-model"></select></label>
+      <div class="qty">
+        <span class="qty-label">Unidades</span>
+        <div class="stepper">
+          <button type="button" class="ag-btn ag-btn--glass" id="qty-minus" aria-label="Quitar una unidad">−</button>
+          <input class="ag-input body" type="number" id="sale-qty" min="0" max="999" value="0" inputmode="numeric" aria-label="Unidades">
+          <button type="button" class="ag-btn ag-btn--glass" id="qty-plus" aria-label="Añadir una unidad">+</button>
+        </div>
+      </div>
+      <button class="ag-btn ag-btn--primary body" id="sale-submit" disabled>Añadir venta</button>
     </form>
     <p class="hint footnote" id="no-models" hidden>Primero añade algún modelo en “Modelos”.</p>
   </section>
@@ -121,6 +132,7 @@
     <div class="row"><button class="ag-btn ag-btn--glass body" value="signup">Crear cuenta</button><button class="ag-btn ag-btn--primary body" value="login">Entrar</button></div>
   </form>
 </dialog>
+<div id="toast" class="ag-toast toast" role="status" aria-live="polite" hidden><p class="ag-toast__message body" id="toast-msg"></p><button type="button" class="ag-toast__action" id="toast-undo">Deshacer</button></div>
 <script src="config.js"></script>
 <script src="vendor/supabase.js"></script>
 <script src="app.js"></script>

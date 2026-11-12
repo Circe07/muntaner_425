@@ -72,13 +72,13 @@ const eur = n => (Math.round(n * 100) / 100).toLocaleString('es-ES', { maximumFr
 const goalsFor = m => state.goals[m] || { alta: 0, media: 0, baja: 0 };
 const incOf = (g, x) => +((g.inc || {})[x]) || 0;
 const maxOf = (g, x) => Math.max(100, +((g.max || {})[x]) || 100);   // tope de cumplimiento (%)
-const soldIn = (sales, x) => sales.filter(s => s.gama === x).reduce((a, s) => a + s.qty, 0);
+const soldIn = (sales, x) => Math.max(0, sales.filter(s => s.gama === x).reduce((a, s) => a + s.qty, 0));
 // Incentivo de gama: <80% → 0; desde el 80% lineal (cumplimiento × importe) hasta el tope de la gama.
 const earned = (sold, goal, inc, maxPct) => !goal || sold < Math.ceil(goal * 0.8) ? 0 : inc * Math.min(sold / goal, maxPct / 100);
 // Incentivo por unidad: importes en orden (1ª, 2ª, 3ª…); el último se repite para el resto.
 const unitPay = (amounts, n) => { let t = 0; for (let i = 0; i < n; i++) t += +amounts[Math.min(i, amounts.length - 1)] || 0; return t; };
 const unitRows = (g, sales) => (g.unit || []).map(r => {
-  const n = sales.filter(s => s.name === r.model).reduce((a, s) => a + s.qty, 0);
+  const n = Math.max(0, sales.filter(s => s.name === r.model).reduce((a, s) => a + s.qty, 0));
   return { model: r.model, amounts: r.amounts, n, pay: unitPay(r.amounts, n), next: +r.amounts[Math.min(n, r.amounts.length - 1)] || 0 };
 });
 function incentives(m) {
@@ -100,7 +100,10 @@ function render() {
   const sales = monthSales();
 
   // selector de modelos
-  $('sale-model').innerHTML = state.models.map(m => `<option value="${m.id}">${esc(m.name)} (${LABEL[m.gama]})</option>`).join('');
+  const picked = $('sale-model').value;
+  $('sale-model').innerHTML = '<option value="" selected disabled>Elige un modelo…</option>' + state.models.map(m => `<option value="${m.id}">${esc(m.name)} (${LABEL[m.gama]})</option>`).join('');
+  if (state.models.some(m => m.id === picked)) $('sale-model').value = picked;
+  updateSaleForm();
   $('no-models').hidden = state.models.length > 0;
   $('sale-form').hidden = state.models.length === 0;
 
@@ -168,7 +171,7 @@ function render() {
   // listado de ventas
   $('total').textContent = sales.reduce((a, s) => a + s.qty, 0) + ' uds.';
   $('sales').tBodies[0].innerHTML = sales.length
-    ? sales.map(s => `<tr><td class="nw">${s.date.slice(8)}/${s.date.slice(5, 7)}</td><td>${esc(s.name)}</td><td><span class="tag ${s.gama}">${LABEL[s.gama]}</span></td><td class="n">${s.qty}</td><td class="n"><button class="del" aria-label="Borrar venta" data-sale="${s.id}" title="Borrar">✕</button></td></tr>`).join('')
+    ? sales.map(s => `<tr><td class="nw">${s.date.slice(8)}/${s.date.slice(5, 7)}</td><td>${esc(s.name)}${s.qty < 0 ? ' <span class="ret">devolución</span>' : ''}</td><td><span class="tag ${s.gama}">${LABEL[s.gama]}</span></td><td class="n">${s.qty < 0 ? '−' + Math.abs(s.qty) : s.qty}</td><td class="n"><button class="del" aria-label="Borrar venta" data-sale="${s.id}" title="Borrar">✕</button></td></tr>`).join('')
     : '<tr><td colspan="5" class="empty">Sin ventas este mes</td></tr>';
 
   // gestión de modelos
@@ -262,15 +265,44 @@ $('prev').onclick = () => shiftMonth(-1);
 $('next').onclick = () => shiftMonth(1);
 $('month').onchange = e => { if (e.target.value) { month = e.target.value; setDefaultDate(); render(); } };
 
+let kind = 'venta', toastTimer = null;
+const getQty = () => Math.min(999, Math.max(0, parseInt($('sale-qty').value, 10) || 0));
+function updateSaleForm() {
+  const ok = !!$('sale-model').value && getQty() > 0;
+  $('sale-submit').disabled = !ok;
+  $('sale-submit').textContent = kind === 'venta' ? 'Añadir venta' : 'Registrar devolución';
+  $('sale-submit').classList.toggle('ag-btn--primary', kind === 'venta');
+  $('sale-submit').classList.toggle('ag-btn--danger', kind !== 'venta');
+  $('qty-minus').disabled = getQty() <= 0;
+}
+function showToast(msg, undo) {
+  $('toast-msg').textContent = msg; $('toast').hidden = false;
+  $('toast-undo').onclick = () => { undo(); $('toast').hidden = true; clearTimeout(toastTimer); };
+  clearTimeout(toastTimer); toastTimer = setTimeout(() => { $('toast').hidden = true; }, 8000);
+}
+document.querySelectorAll('.seg-btn').forEach(b => b.onclick = () => {
+  kind = b.dataset.kind;
+  document.querySelectorAll('.seg-btn').forEach(x => x.setAttribute('aria-pressed', String(x === b)));
+  updateSaleForm();
+});
+$('qty-plus').onclick = () => { $('sale-qty').value = Math.min(999, getQty() + 1); updateSaleForm(); };
+$('qty-minus').onclick = () => { $('sale-qty').value = Math.max(0, getQty() - 1); updateSaleForm(); };
+$('sale-qty').oninput = updateSaleForm;
+$('sale-model').onchange = updateSaleForm;
 $('sale-form').onsubmit = e => {
   e.preventDefault();
-  const m = state.models.find(x => x.id === $('sale-model').value);
-  const qty = parseInt($('sale-qty').value, 10);
-  if (!m || !(qty > 0)) return;
-  state.sales.push({ id: uid(), date: $('sale-date').value, modelId: m.id, name: m.name, gama: m.gama, qty });
-  save();
-  month = $('sale-date').value.slice(0, 7);
-  $('sale-qty').value = 1; render();
+  const m = state.models.find(x => x.id === $('sale-model').value), qty = getQty(), date = $('sale-date').value;
+  if (!m || qty <= 0 || !date) return;           // sin modelo o con 0 unidades no se añade nada
+  if (kind === 'devolucion') {
+    const mes = date.slice(0, 7), have = state.sales.filter(s => s.date.startsWith(mes) && s.name === m.name).reduce((a, s) => a + s.qty, 0);
+    if (qty > have) { alert(`En ${monthName(mes)} solo hay ${Math.max(0, have)} uds. de ${m.name}. Pon la fecha en el mes de la venta.`); return; }
+  }
+  const sale = { id: uid(), date, modelId: m.id, name: m.name, gama: m.gama, qty: kind === 'venta' ? qty : -qty };
+  state.sales.push(sale); save();
+  month = date.slice(0, 7);
+  $('sale-qty').value = 0; $('sale-model').value = '';
+  render();
+  showToast(`${kind === 'venta' ? 'Añadidas' : 'Devueltas'} ${qty} × ${m.name}`, () => { state.sales = state.sales.filter(s => s.id !== sale.id); save(); render(); });
 };
 $('model-form').onsubmit = e => {
   e.preventDefault();
@@ -402,7 +434,10 @@ document.addEventListener('click', e => {
   if (e.target.matches('[data-open-goals]')) return openGoals();
   if (e.target.matches('[data-rule-del]')) return e.target.closest('.rule').remove();
   const sid = e.target.dataset && e.target.dataset.sale, mid = e.target.dataset && e.target.dataset.model;
-  if (sid && confirm('¿Borrar esta venta?')) { state.sales = state.sales.filter(s => s.id !== sid); save(); render(); }
+  if (sid) {
+    const s = state.sales.find(x => x.id === sid);
+    if (s && confirm(`¿Borrar ${s.qty < 0 ? 'la devolución de ' + Math.abs(s.qty) : s.qty} × ${s.name} del ${s.date.slice(8)}/${s.date.slice(5, 7)}? Se recalcularán los objetivos e incentivos.`)) { state.sales = state.sales.filter(x => x.id !== sid); save(); render(); }
+  }
   if (mid) {
     const m = state.models.find(x => x.id === mid);
     if (confirm(`¿Quitar “${m.name}” de la lista? Sus ventas ya registradas se mantienen.`)) { state.models = state.models.filter(x => x.id !== mid); save(); render(); }
