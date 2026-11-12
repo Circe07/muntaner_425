@@ -27,12 +27,35 @@ const NOV_SALES = [['PAD 4', 2], ['PAD 10', 13], ['PAD X8b', 1], ['H400 Smart', 
 // Plantilla de la marca (campaña noviembre 2026): sirve para rellenar el primer mes de cada cuenta nueva.
 const BRAND_TEMPLATE = { inc: NOV.goals.inc, max: NOV.goals.max, unit: NOV.goals.unit };
 // Cuenta nueva: modelos de la marca, sin ventas ni objetivos (cada persona pone los suyos).
-const freshState = () => ({ models: [], sales: [], goals: {}, plans: {}, settings: {}, seedVersion: 8 });
+const freshState = () => ({ models: [], sales: [], goals: {}, plans: {}, settings: {}, periods: {}, seedVersion: 8 });
 const seedNames = new Set(SEED.map(([n]) => n.trim().toLowerCase()));
 const isSeedName = n => seedNames.has(String(n).trim().toLowerCase());
 const nowMonth = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`; };
 let state = load();
-let month = nowMonth();
+let month = currentKey();
+
+// Cada "mes" va por defecto del día 1 al último día. Si una empresa cierra otro día (meses de 4 y 5 semanas…),
+// se le da un periodo propio: state.periods['2026-10'] = { from, to }. Cada venta pertenece a UN solo periodo.
+function localToday() { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; }
+function naturalRange(m) { const [y, n] = m.split('-').map(Number); return { from: `${m}-01`, to: `${m}-${String(new Date(y, n, 0).getDate()).padStart(2, '0')}` }; }
+function isCustomPeriod(m) { const c = state.periods && state.periods[m]; return !!(c && c.from && c.to); }
+function monthRange(m) { return isCustomPeriod(m) ? state.periods[m] : naturalRange(m); }
+function shiftKey(k, d) { const [y, n] = k.split('-').map(Number); const dt = new Date(y, n - 1 + d, 1); return `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}`; }
+function periodKeyFor(date) {
+  const hit = Object.keys(state.periods || {}).filter(k => { const r = state.periods[k]; return r && r.from && r.to && date >= r.from && date <= r.to; }).sort();
+  if (hit.length) return hit[hit.length - 1];
+  let k = date.slice(0, 7);
+  for (let i = 0; i < 3; i++) {   // un mes con periodo propio que no contiene la fecha cede esa fecha al mes vecino
+    const c = state.periods && state.periods[k];
+    if (!(c && c.from && c.to) || (date >= c.from && date <= c.to)) return k;
+    k = shiftKey(k, date < c.from ? -1 : 1);
+  }
+  return k;
+}
+function currentKey() { return periodKeyFor(localToday()); }
+const fmtD = d => `${d.slice(8)}/${d.slice(5, 7)}/${d.slice(0, 4)}`;
+const addDays = (d, n) => { const x = new Date(d + 'T12:00:00'); x.setDate(x.getDate() + n); return `${x.getFullYear()}-${String(x.getMonth() + 1).padStart(2, '0')}-${String(x.getDate()).padStart(2, '0')}`; };
+const daysBetween = (a, b) => Math.round((new Date(b + 'T12:00:00') - new Date(a + 'T12:00:00')) / 864e5) + 1;
 
 function load() {
   let s = null;
@@ -45,6 +68,7 @@ function migrate(s) {
   if (!s.goals) s.goals = {};
   if (!s.plans) s.plans = {};
   if (!s.settings) s.settings = {};
+  if (!s.periods) s.periods = {};
   if (v < 2) {
     const used = new Set(s.sales.map(x => x.modelId));
     s.models = s.models.filter(m => !(OLD_SEED.includes(m.name) && !used.has(m.id)));
@@ -95,7 +119,7 @@ function plansOf(m) {
   return [];
 }
 const hasGoals = m => plansOf(m).length > 0;
-const evalMonth = (m, sales) => Plan.evaluateAll(plansOf(m), sales);
+const evalMonth = (m, sales) => Plan.evaluateAll(plansOf(m), sales, state.sales);
 // último mes anterior con un plan mensual (sin fechas propias) que se pueda repetir
 function previousPlan(m) {
   for (const k of monthKeys().filter(x => x < m).reverse()) { const p = plansOf(k).find(x => !x.period); if (p) return { month: k, plan: p }; }
@@ -122,7 +146,7 @@ const MESES = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto'
 const MES3 = ['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
 const monthShort = m => { const [y, n] = m.split('-'); return `${MES3[+n - 1]} ${y}`; };
 const monthName = m => { const [y, n] = m.split('-'); return `${MESES[+n - 1]} ${y}`; };
-const salesOf = m => state.sales.filter(s => s.date.startsWith(m));
+const salesOf = m => state.sales.filter(s => periodKeyFor(s.date) === m);
 const monthSales = () => salesOf(month).sort((a, b) => b.date.localeCompare(a.date));
 
 function objectiveCard(o, ev, idx) {
@@ -172,6 +196,9 @@ function render() {
   $('sale-form').hidden = state.models.length === 0;
 
   // objetivos
+  const pn = $('period-note');
+  pn.hidden = !isCustomPeriod(month);
+  if (!pn.hidden) pn.firstElementChild.textContent = `Periodo de ${monthName(month)}: del ${fmtD(monthRange(month).from)} al ${fmtD(monthRange(month).to)}`;
   $('goal-banner').hidden = !!plan;
   $('edit-goals').hidden = !plan;
   $('gamas').innerHTML = ev ? ev.entries.map((en, pi) => {
@@ -204,7 +231,7 @@ function render() {
   }
 
   // historial
-  const ms = new Set([...monthKeys(), ...state.sales.map(s => s.date.slice(0, 7)), nowMonth()]);
+  const ms = new Set([...monthKeys(), ...state.sales.map(s => periodKeyFor(s.date)), currentKey()]);
   $('history').tBodies[0].innerHTML = [...ms].sort().reverse().map(m => {
     const e2 = hasGoals(m) ? evalMonth(m, salesOf(m)) : null;
     const chips = e2 ? e2.entries.flatMap(en => en.ev.objectives).filter(o => o.target > 0).slice(0, 6).map(o => `<span class="chip">${esc(o.name)} <b>${Math.round(o.pct)}%</b></span>`).join('') || '<span class="empty">Solo incentivos por unidad</span>' : '<span class="empty">Sin objetivos</span>';
@@ -255,8 +282,8 @@ function shiftMonth(d) {
   setDefaultDate(); render();
 }
 function setDefaultDate() {
-  const today = new Date(); const t = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
-  $('sale-date').value = t.startsWith(month) ? t : month + '-01';
+  const t = localToday(), r = monthRange(month);
+  $('sale-date').value = (t >= r.from && t <= r.to) ? t : r.from;
 }
 
 $('prev').onclick = () => shiftMonth(-1);
@@ -297,13 +324,13 @@ $('sale-form').onsubmit = e => {
   if (!m || qty <= 0 || !date) return;           // sin modelo o con 0 unidades no se añade nada
   if (needsAmount() && !(getAmount() > 0)) { alert('Pon el importe total de la venta (€): tus objetivos son en dinero.'); return; }
   if (kind === 'devolucion') {
-    const mes = date.slice(0, 7), have = state.sales.filter(s => s.date.startsWith(mes) && s.name === m.name).reduce((a, s) => a + s.qty, 0);
-    if (qty > have) { alert(`En ${monthName(mes)} solo hay ${Math.max(0, have)} uds. de ${m.name}. Pon la fecha en el mes de la venta.`); return; }
+    const key = periodKeyFor(date), have = state.sales.filter(s => periodKeyFor(s.date) === key && s.name === m.name).reduce((a, s) => a + s.qty, 0);
+    if (qty > have) { alert(`En ${monthName(key)} solo hay ${Math.max(0, have)} uds. de ${m.name}. Pon la fecha en el periodo de la venta.`); return; }
   }
   const sale = { id: uid(), date, modelId: m.id, name: m.name, gama: m.gama, qty: kind === 'venta' ? qty : -qty };
   if (needsAmount()) sale.amount = kind === 'venta' ? getAmount() : -getAmount();
   state.sales.push(sale); save();
-  month = date.slice(0, 7);
+  month = periodKeyFor(date);
   $('sale-qty').value = 0; $('sale-model').value = ''; $('sale-amount').value = '';
   render();
   showToast(`${kind === 'venta' ? 'Añadidas' : 'Devueltas'} ${qty} × ${m.name}`, () => { state.sales = state.sales.filter(s => s.id !== sale.id); save(); render(); });
@@ -326,7 +353,7 @@ $('models-clear').onclick = () => {
 // ---------- objetivos del mes: diálogo con 4 pasos ----------
 let draft = null, aiAdd = false, reviewCtx = { editIndex: null };
 const todayStr = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
-const STEPS = ['start', 'ia', 'review', 'manual'];
+const STEPS = ['start', 'ia', 'review', 'manual', 'period'];
 function showStep(s) {
   STEPS.forEach(x => { $('pd-' + x).hidden = x !== s; });
   $('plan-dialog').scrollTop = 0;
@@ -339,6 +366,7 @@ function openPlanDialog(step) {
   $('pd-go-edit').hidden = nPlans !== 1;
   $('pd-go-add').hidden = nPlans < 1;
   $('pd-go-repeat').hidden = !prev;
+  $('pd-period-desc').textContent = `${isCustomPeriod(month) ? 'Personalizado' : 'Mes natural'}: del ${fmtD(monthRange(month).from)} al ${fmtD(monthRange(month).to)}. Cámbialo si tu mes cierra otro día.`;
   if (prev) $('pd-repeat-desc').textContent = `Copia el plan de ${monthName(prev.month)} y ajustas las metas.`;
   $('pd-errors').hidden = true; $('pd-fallback').hidden = true; $('pd-copy').textContent = 'Copiar instrucciones';
   showStep(step || 'start');
@@ -351,6 +379,36 @@ document.querySelectorAll('[data-back]').forEach(b => b.onclick = () => showStep
 $('pd-go-ia').onclick = () => { aiAdd = false; showStep('ia'); };
 $('pd-go-add').onclick = () => { aiAdd = true; showStep('ia'); };
 $('pd-go-manual').onclick = () => { fillManual(); showStep('manual'); };
+function periodEndFromForm() {
+  const from = $('pd-per-from').value, dur = $('pd-per-dur').value;
+  if (!from) return '';
+  if (dur === '4' || dur === '5') return addDays(from, 7 * +dur - 1);
+  if (dur === 'natural') return naturalRange(from.slice(0, 7)).to;
+  return $('pd-per-to').value;
+}
+function paintPeriod() {
+  const from = $('pd-per-from').value, to = periodEndFromForm(), ok = !!(from && to && from <= to);
+  $('pd-per-to-wrap').hidden = $('pd-per-dur').value !== 'otra';
+  $('pd-per-preview').textContent = ok ? `Del ${fmtD(from)} al ${fmtD(to)} (${daysBetween(from, to)} días)` : 'Elige la fecha de inicio y la de fin.';
+  $('pd-per-save').disabled = !ok;
+}
+function openPeriodStep() {
+  const r = monthRange(month), days = daysBetween(r.from, r.to);
+  $('pd-per-from').value = r.from; $('pd-per-to').value = r.to;
+  $('pd-per-dur').value = !isCustomPeriod(month) ? 'natural' : days === 28 ? '4' : days === 35 ? '5' : 'otra';
+  paintPeriod(); showStep('period');
+}
+$('pd-go-period').onclick = openPeriodStep;
+['pd-per-from', 'pd-per-dur', 'pd-per-to'].forEach(id => $(id).addEventListener('input', paintPeriod));
+$('pd-per-save').onclick = () => {
+  const from = $('pd-per-from').value, to = periodEndFromForm();
+  if (!(from && to && from <= to)) return;
+  const nat = naturalRange(month);
+  if (from === nat.from && to === nat.to) delete state.periods[month]; else state.periods[month] = { from, to };
+  save(); closePlanDialog(); setDefaultDate(); render();
+  showToast(`Periodo de ${monthName(month)}: del ${fmtD(from)} al ${fmtD(to)}`, null);
+};
+$('pd-per-reset').onclick = () => { delete state.periods[month]; save(); closePlanDialog(); setDefaultDate(); render(); showToast('Periodo: mes natural', null); };
 $('pd-go-repeat').onclick = () => {
   const prev = previousPlan(month); if (!prev) return;
   startReview(clone(prev.plan), `Plan copiado de ${monthName(prev.month)}: ajusta las metas y recompensas de este mes.`, [], false, { editIndex: null, addDefault: false });
@@ -378,6 +436,16 @@ $('pd-review-btn').onclick = () => {
 };
 
 // paso revisar
+// Un plan con fechas largas (casi un mes) suele ser el periodo del mes entero: se ofrece usarlo como periodo de este mes.
+function periodEligible(plan) { const p = plan.period; return !!(p && p.from && p.to && daysBetween(p.from, p.to) >= 21 && reviewCtx.editIndex === null); }
+function syncUsePeriod(plan, initial) {
+  const adding = !$('pd-mode').hidden && document.querySelector('input[name=pdmode]:checked') && document.querySelector('input[name=pdmode]:checked').value === 'add';
+  const show = periodEligible(plan) && !adding;
+  $('pd-useperiod-wrap').hidden = !show;
+  if (periodEligible(plan)) $('pd-useperiod-text').textContent = `Usar estas fechas (del ${fmtD(plan.period.from)} al ${fmtD(plan.period.to)}) como el periodo de ${monthName(month)}: ventas, historial y reporte`;
+  if (initial) $('pd-useperiod').checked = periodEligible(plan);
+}
+document.querySelectorAll('input[name=pdmode]').forEach(r => r.addEventListener('change', () => { if (draft) syncUsePeriod(draft, false); }));
 function renderGroups(plan) {
   const box = $('pd-groups');
   const inGroup = new Set(plan.groups.flatMap(g => g.models.map(norm)));
@@ -406,6 +474,7 @@ function startReview(plan, note, warnings, replaceDefault, ctx = {}) {
   warn.innerHTML = warnings.map(x => `<li>${esc(x)}</li>`).join(''); warn.hidden = !warnings.length;
   const notes = plan.notes || [];
   $('pd-notes-list').innerHTML = notes.map(x => `<li>${esc(x)}</li>`).join(''); $('pd-notes').hidden = !notes.length;
+  syncUsePeriod(plan, true);
   const hasModels = plan.groups.some(g => g.models.length) || plan.unit_incentives.some(r => (r.scope.models || []).length);
   $('pd-models-wrap').hidden = !hasModels;
   $('pd-models').checked = hasModels && replaceDefault;
@@ -431,9 +500,14 @@ $('pd-apply').onclick = () => {
   const bad = draft.objectives.find(o => !(o.target > 0));
   if (bad) { alert(`La meta de «${bad.name}» tiene que ser mayor que 0.`); return; }
   const mode = reviewCtx.editIndex !== null ? 'edit' : ($('pd-mode').hidden ? 'replace' : document.querySelector('input[name=pdmode]:checked').value);
-  commitPlan(draft, $('pd-models').checked, mode, reviewCtx.editIndex);
+  commitPlan(draft, $('pd-models').checked, mode, reviewCtx.editIndex, !$('pd-useperiod-wrap').hidden && $('pd-useperiod').checked);
 };
-function commitPlan(plan, replaceModels, mode, editIndex) {
+function commitPlan(plan, replaceModels, mode, editIndex, usePeriod) {
+  if (usePeriod && plan.period) {   // las fechas del plan pasan a ser el periodo del mes (y el plan las sigue)
+    const nat = naturalRange(month), p = plan.period;
+    if (p.from === nat.from && p.to === nat.to) delete state.periods[month]; else state.periods[month] = { from: p.from, to: p.to };
+    plan = { ...plan, period: null };
+  }
   const base = plansOf(month).map(clone);   // incluye el plan sencillo convertido si el mes aún no tenía lista
   let list;
   if (mode === 'edit') { list = base; list[editIndex] = clone(plan); }
@@ -517,7 +591,7 @@ $('models').onchange = e => {
 let askedFor = '', ready = false;
 function checkNewMonth() {
   if (!ready) return;
-  const cur = nowMonth();
+  const cur = currentKey();
   if (cur !== askedFor && !hasGoals(cur)) {
     askedFor = cur; month = cur; setDefaultDate(); render();
     if (!$('plan-dialog').open) openPlanDialog('start');
@@ -527,6 +601,7 @@ document.addEventListener('visibilitychange', () => { if (!document.hidden) chec
 setInterval(checkNewMonth, 60000);
 document.addEventListener('click', e => {
   if (e.target.matches('[data-open-goals]')) return openPlanDialog('start');
+  if (e.target.matches('[data-open-period]')) { openPlanDialog('start'); openPeriodStep(); return; }
   if (e.target.matches('[data-rule-del]')) return e.target.closest('.rule').remove();
   const pe = e.target.dataset && e.target.dataset.planEdit, pd = e.target.dataset && e.target.dataset.planDel;
   if (pe !== undefined) { const p = plansOf(month)[+pe]; if (p) startReview(clone(p), `Ajusta las metas y recompensas de «${p.name || 'este plan'}».`, [], false, { editIndex: +pe }); return; }
@@ -576,8 +651,8 @@ function typeOfSale(s, ym) {
   return Report.deviceType(s.name, gname, model && model.tipo);
 }
 function buildDayReport() {
-  const date = $('rp-date').value || todayStr();
-  return Report.build({ date, sales: state.sales, typeOf: s => typeOfSale(s, date.slice(0, 7)), title: $('rp-title').value.trim(), emoji: $('rp-emoji').checked, withMonth: $('rp-month').checked });
+  const date = $('rp-date').value || todayStr(), to = $('rp-to').value;
+  return Report.build({ date, to, monthFrom: monthRange(periodKeyFor(date)).from, sales: state.sales, typeOf: s => typeOfSale(s, periodKeyFor(s.date)), title: $('rp-title').value.trim(), emoji: $('rp-emoji').checked, withMonth: $('rp-month').checked });
 }
 function paintReport() {
   const r = buildDayReport();
@@ -590,7 +665,7 @@ function paintReport() {
 }
 function openReport() {
   const st = state.settings || (state.settings = {});
-  $('rp-date').value = todayStr();
+  $('rp-date').value = todayStr(); $('rp-to').value = '';
   $('rp-title').value = st.reportTitle || '';
   $('rp-emoji').checked = st.reportEmoji !== false;
   $('rp-month').checked = !!st.reportMonth;
@@ -598,9 +673,9 @@ function openReport() {
   const dlg = $('report-dialog'); if (!dlg.open) dlg.showModal();
   $('rp-head').focus();
 }
-['rp-date', 'rp-title', 'rp-emoji', 'rp-month'].forEach(id => $(id).addEventListener('input', () => {
+['rp-date', 'rp-to', 'rp-title', 'rp-emoji', 'rp-month'].forEach(id => $(id).addEventListener('input', () => {
   paintReport();
-  if (id === 'rp-date') return;
+  if (id === 'rp-date' || id === 'rp-to') return;
   state.settings = state.settings || {};
   state.settings.reportTitle = $('rp-title').value.trim(); state.settings.reportEmoji = $('rp-emoji').checked; state.settings.reportMonth = $('rp-month').checked;
   save();

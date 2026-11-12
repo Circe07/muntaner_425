@@ -39,10 +39,12 @@
   const dmy = d => `${d.slice(8)}/${d.slice(5, 7)}/${d.slice(0, 4)}`;
   const uds = n => `${n} ${Math.abs(n) === 1 ? 'ud.' : 'uds.'}`;
 
-  // o: { date:'AAAA-MM-DD', sales:[...], typeOf(sale)->clave, title, emoji, withMonth }
+  // o: { date:'AAAA-MM-DD', to?:'AAAA-MM-DD' (si se pone, reporte de varios días), monthFrom?:'AAAA-MM-DD' (inicio del periodo del mes),
+  //      sales:[...], typeOf(sale)->clave, title, emoji, withMonth }
   function build(o) {
-    const day = o.sales.filter(s => s && s.date === o.date && isFinite(s.qty));
-    const month = o.date.slice(0, 7);
+    const end = o.to && o.to > o.date ? o.to : o.date, multi = end !== o.date;
+    const from = o.monthFrom || o.date.slice(0, 7) + '-01';
+    const day = o.sales.filter(s => s && s.date >= o.date && s.date <= end && isFinite(s.qty));
     const cats = new Map();
     day.forEach(s => {
       const k = o.typeOf(s);
@@ -52,9 +54,9 @@
       c.qty += s.qty; c.amount += +s.amount || 0;
     });
     const monthByType = {};
-    if (o.withMonth) o.sales.forEach(s => { if (s && s.date && s.date.startsWith(month) && s.date <= o.date && isFinite(s.qty)) { const k = o.typeOf(s); monthByType[k] = (monthByType[k] || 0) + s.qty; } });
+    if (o.withMonth) o.sales.forEach(s => { if (s && s.date && s.date >= from && s.date <= end && isFinite(s.qty)) { const k = o.typeOf(s); monthByType[k] = (monthByType[k] || 0) + s.qty; } });
 
-    const lines = [`*Reporte del día ${dmy(o.date)}*`];
+    const lines = [multi ? `*Reporte del ${dmy(o.date)} al ${dmy(end)}*` : `*Reporte del día ${dmy(o.date)}*`];
     if (o.title) lines.push(o.title);
     lines.push('');
     let total = 0, shown = 0;
@@ -69,7 +71,7 @@
     });
     if (!shown) return { empty: true, text: '', total: 0 };
     const monthTotal = Object.values(monthByType).reduce((a, b) => a + b, 0);
-    lines.push(`*Total del día: ${uds(total)}*${o.withMonth ? ` — acumulado del mes: ${uds(monthTotal)}` : ''}`);
+    lines.push(`*Total ${multi ? 'del periodo' : 'del día'}: ${uds(total)}*${o.withMonth ? ` — acumulado del mes: ${uds(monthTotal)}` : ''}`);
     return { empty: false, text: lines.join('\n'), total };
   }
 

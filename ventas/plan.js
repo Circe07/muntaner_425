@@ -342,8 +342,9 @@
     };
   }
   // varios planes en un mismo mes (p. ej. el mensual y uno por semana): cada uno con sus fechas; se suma todo
-  function evaluateAll(plans, sales) {
-    const entries = plans.map(plan => ({ plan, ev: evaluate(plan, sales) }));
+  // `sales` son las ventas del periodo del mes; un plan con fechas propias mira TODAS las ventas (`allSales`) dentro de sus fechas
+  function evaluateAll(plans, sales, allSales) {
+    const entries = plans.map(plan => ({ plan, ev: evaluate(plan, plan.period && allSales ? allSales : sales) }));
     const sum = k => entries.reduce((a, e) => a + e.ev[k], 0);
     return { entries, objectivesTotal: sum('objectivesTotal'), objectivesMax: sum('objectivesMax'), units: sum('units'), commissions: sum('commissions'), total: sum('total'), hasRevenue: entries.some(e => e.ev.hasRevenue) };
   }
@@ -456,7 +457,7 @@
       '3. No inventes cifras. Usa solo números que aparezcan en el texto. Si la meta de un objetivo no aparece (suele ser personal), pon "meta": 0 y anótalo en "notas": el usuario la pondrá en la app.',
       '4. Si el texto mezcla varias marcas, meses o programas, usa solo lo que corresponda al mes indicado abajo y a un comercial de tienda. Ignora lo demás (condiciones legales, saludos…). Lo que dependa de otros departamentos o que no se pueda calcular (p. ej. «estrellas», asistencia) no lo incluyas: anótalo en "notas".',
       '5. Números sin símbolo ni separador de miles (40000, no "40.000 €"). Porcentajes sin el símbolo %.',
-      '6. Si el texto es de un periodo concreto (una semana, una quincena, una campaña), pon "periodo" con fechas AAAA-MM-DD; la app solo contará las ventas de esas fechas. Si pone «esta semana», resuélvela con la fecha de hoy que te doy abajo (semana = lunes a domingo).',
+      '6. PERIODO: si el texto indica en qué fechas cuentan los objetivos (p. ej. «del 6 de octubre al 2 de noviembre», «mes de 5 semanas», «cierra el día 3», una semana, una quincena, una campaña), pon "periodo" con fechas AAAA-MM-DD; la app solo contará las ventas de esas fechas. Deduce el año con el MES y la fecha de hoy que te doy abajo. Si pone «esta semana», resuélvela con esa fecha (semana = lunes a domingo). Si el texto NO indica periodo, NO pongas "periodo": se usará el mes natural (del día 1 al último).',
       '7. MODELOS Y CATEGORÍAS: saca los modelos DEL TEXTO. Usa SOLO modelos que aparezcan en el texto: NUNCA añadas modelos de memoria, de otra marca ni de ningún ejemplo de este mensaje. Si hay objetivos por categoría (móviles, tablets, relojes o wearables, portátiles, auriculares, TV, accesorios…), crea un grupo por cada categoría y coloca en su "modelos" TODOS los modelos que cite el texto, cada uno en la categoría que le corresponda según el tipo de producto (usa lo que sepas del producto: «Pad/Tab» = tablet, «Watch/Band/Fit» = reloj o pulsera, «Book/Laptop» = portátil, «Buds/TWS» = auriculares, un teléfono = móvil…). Si el texto ya trae una tabla modelo → categoría, respétala tal cual. Si no sabes a qué categoría pertenece un modelo, déjalo fuera de los grupos y apúntalo en "notas".',
       '',
       'FORMATO DEL JSON (todos los campos salvo "objetivos" o "incentivos_por_unidad" son opcionales)',

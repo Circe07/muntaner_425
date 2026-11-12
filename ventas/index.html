@@ -54,6 +54,7 @@
 
   <section class="card ag-card ag-grain">
     <h2 class="title3">Objetivos y progreso</h2>
+    <p class="period-note" id="period-note" hidden><span></span> <button type="button" class="pill" data-open-period>Cambiar</button></p>
     <div id="gamas" class="gamas"></div>
     <div id="inc-total" class="inc-total"></div>
     <details class="howto" id="plan-howto" hidden><summary>Cómo se calcula tu incentivo</summary><ul class="plan-lines" id="plan-lines"></ul></details>
@@ -142,6 +143,7 @@
       <button type="button" class="choice" id="pd-go-repeat" hidden><strong>Repetir el mes anterior</strong><span id="pd-repeat-desc"></span></button>
       <button type="button" class="choice" id="pd-go-add" hidden><strong>Añadir otro plan al mes</strong><span>Para un plan semanal o de una campaña concreta (cada uno con sus fechas): se suma a lo que ya tienes.</span></button>
       <button type="button" class="choice" id="pd-go-edit" hidden><strong>Ajustar los objetivos de este mes</strong><span>Cambia las metas y las recompensas del plan actual.</span></button>
+      <button type="button" class="choice" id="pd-go-period"><strong>Periodo del mes</strong><span id="pd-period-desc"></span></button>
       <button type="button" class="choice" id="pd-go-manual"><strong>A mano (sencillo)</strong><span>Tres gamas —alta, media y baja— con unidades, incentivo y tope.</span></button>
     </div>
   </section>
@@ -171,8 +173,20 @@
       <label class="check"><input type="radio" name="pdmode" value="add"> <span>Añadirlo como un plan más (p. ej. el de esta semana)</span></label>
       <label class="check"><input type="radio" name="pdmode" value="replace"> <span>Reemplazar los planes de este mes</span></label>
     </fieldset>
+    <label class="check" id="pd-useperiod-wrap" hidden><input type="checkbox" id="pd-useperiod"> <span id="pd-useperiod-text"></span></label>
     <label class="check" id="pd-models-wrap" hidden><input type="checkbox" id="pd-models"> <span>Sustituir mi lista de modelos por la de este plan (recomendado si cambias de marca)</span></label>
     <div class="row"><button type="button" class="ag-btn ag-btn--glass body" data-back>Volver</button><button type="button" class="ag-btn ag-btn--primary body" id="pd-apply">Aplicar objetivos</button></div>
+  </section>
+
+  <section id="pd-period" hidden>
+    <p class="hint footnote">Por defecto cada mes va del día 1 al último día. Si en tu empresa un mes cierra otro día (por ejemplo, meses de 4 y de 5 semanas), pon aquí cuándo empieza y cuándo acaba <strong>este</strong> periodo. Las ventas, el historial y el reporte lo usarán.</p>
+    <div class="rp-controls">
+      <label>Empieza el <input class="ag-input body" type="date" id="pd-per-from"></label>
+      <label>Dura <select class="ag-input body" id="pd-per-dur"><option value="natural">Hasta el último día de ese mes</option><option value="4">4 semanas (28 días)</option><option value="5">5 semanas (35 días)</option><option value="otra">Hasta otra fecha…</option></select></label>
+      <label id="pd-per-to-wrap" hidden>Termina el <input class="ag-input body" type="date" id="pd-per-to"></label>
+    </div>
+    <p class="hint" id="pd-per-preview"></p>
+    <div class="row"><button type="button" class="ag-btn ag-btn--glass body" data-back>Volver</button><button type="button" class="ag-btn ag-btn--glass body" id="pd-per-reset">Mes natural</button><button type="button" class="ag-btn ag-btn--primary body" id="pd-per-save">Guardar periodo</button></div>
   </section>
 
   <section id="pd-manual" hidden>
@@ -218,7 +232,8 @@
 <dialog id="report-dialog" class="ag-grain">
   <div class="pd-head"><h2 class="title3" id="rp-head" tabindex="-1">Reporte del día</h2><button type="button" class="del" id="rp-x" aria-label="Cerrar">✕</button></div>
   <div class="rp-controls">
-    <label>Día <input class="ag-input body" type="date" id="rp-date"></label>
+    <label>Día (o desde) <input class="ag-input body" type="date" id="rp-date"></label>
+    <label>Hasta (opcional: para un reporte de varios días) <input class="ag-input body" type="date" id="rp-to"></label>
     <label>Nombre en el reporte (opcional) <input class="ag-input body" id="rp-title" maxlength="60" placeholder="Ej. Honor · Media Markt El Prat" autocomplete="off"></label>
     <label class="check"><input type="checkbox" id="rp-month"> <span>Incluir el acumulado del mes</span></label>
     <label class="check"><input type="checkbox" id="rp-emoji" checked> <span>Con emojis</span></label>
