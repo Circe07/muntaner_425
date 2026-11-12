@@ -32,7 +32,7 @@
     const fence = t.match(/```(?:json)?\s*([\s\S]*?)```/i);
     if (fence) t = fence[1].trim();
     const a = t.indexOf('{'), b = t.lastIndexOf('}');
-    if (a < 0) return { error: 'No encuentro ningún JSON en lo que has pegado. Copia la respuesta completa de tu IA (el bloque de código).' };
+    if (a < 0) return { error: 'No encuentro ningún JSON en lo que has pegado. Si tu IA te ha hecho una pregunta, respóndele: «Asume lo más razonable y devuélveme ya el JSON, sin preguntas». Después copia el bloque de código completo.' };
     if (b <= a) return { error: 'El JSON está incompleto (falta el final). Copia la respuesta entera de tu IA, hasta el último cierre.' };
     try { return { value: JSON.parse(t.slice(a, b + 1)) }; }
     catch (e) { return { error: 'El JSON está incompleto o tiene algún error. Pídele a tu IA: «Devuélveme el JSON completo y válido, solo el bloque de código».' }; }
@@ -159,9 +159,10 @@
       commissions.push({ name, scope: readScope(pick(r, 'ambito', 'ámbito', 'scope'), r, `Comisión «${name}»`), percent });
     });
 
+    const notes = strs(pick(raw, 'notas', 'notes', 'supuestos', 'dudas')).slice(0, 12).map(x => x.slice(0, 300));
     if (errors.length) return { plan: null, errors, warnings };
     return {
-      plan: { v: 1, brand: String(pick(raw, 'marca', 'brand') ?? '').trim().slice(0, 60), groups, objectives, unit_incentives, commissions },
+      plan: { v: 1, brand: String(pick(raw, 'marca', 'brand') ?? '').trim().slice(0, 60), groups, objectives, unit_incentives, commissions, notes },
       errors, warnings
     };
   }
@@ -177,7 +178,7 @@
     return {
       v: 1, brand: '', groups: LEGACY_GROUPS.map(x => ({ ...x, models: [] })), objectives,
       unit_incentives: (g.unit || []).map(r => ({ name: '', scope: { all: false, groups: [], models: [r.model] }, amounts: r.amounts })),
-      commissions: []
+      commissions: [], notes: []
     };
   }
 
@@ -311,20 +312,23 @@
       { id: 'uds', nombre: 'Unidades de móvil', metrica: 'unidades', ambito: { grupos: ['moviles'] }, meta: 60, pago: { tipo: 'lineal', recompensa: 300, desde_pct: 80, tope_pct: 120 }, alternativa: 'A' },
       { id: 'mix', nombre: 'Dinero en móviles', metrica: 'importe', ambito: { grupos: ['moviles'] }, meta: 30000, pago: { tipo: 'lineal', recompensa: 300, desde_pct: 80, tope_pct: 120 }, alternativa: 'A' }
     ],
-    comisiones: [{ nombre: 'Comisión wearables', ambito: { grupos: ['wearables'] }, porcentaje: 2 }]
+    comisiones: [{ nombre: 'Comisión wearables', ambito: { grupos: ['wearables'] }, porcentaje: 2 }],
+    notas: ['El comunicado no dice si hay tope en wearables: asumí que no.', 'Interpreté «uno de los dos» como alternativa: solo cuenta el que más paga.']
   };
 
   function buildPrompt(opts) {
     const o = opts || {};
     const models = (o.models || []).slice(0, 80);
     return [
-      'Eres un asistente que convierte la política de objetivos e incentivos mensuales de un comercial (un correo, un comunicado, una tabla…) en un JSON estándar que lee mi aplicación "Ventas del mes".',
+      'TAREA: convierte el texto de objetivos e incentivos que hay AL FINAL de este mensaje en un JSON con el formato de abajo. Es para mi app "Ventas del mes", que lo lee automáticamente.',
       '',
-      'CÓMO TRABAJAR',
-      '1. Lee el comunicado que te pego al final.',
-      '2. Si algo es ambiguo (si los objetivos se suman o se cobra solo por uno, si hay tope, desde qué % se cobra, si es en unidades o en dinero…), hazme preguntas breves ANTES de generar el JSON. Si todo está claro, no preguntes.',
-      '3. No inventes cifras: usa solo lo que dice el comunicado.',
-      '4. Cuando todo esté claro, responde SOLO con un único bloque de código ```json con el JSON final, sin texto antes ni después.',
+      'REGLAS ESTRICTAS (léelas antes de empezar)',
+      '1. Responde DE UNA VEZ. NO me hagas preguntas, ni una. Si algo es ambiguo o falta un dato, elige la interpretación más razonable y apúntala en el campo "notas" (una frase corta por cada suposición).',
+      '2. Tu respuesta debe ser SOLO un único bloque de código ```json con el JSON. Nada de texto antes ni después, ni explicaciones, ni saludos.',
+      '3. No inventes cifras. Usa solo números que aparezcan en el texto. Si un dato no aparece, usa el valor por defecto que se indica y anótalo en "notas".',
+      '4. Si el texto mezcla varias marcas, meses o programas, usa solo lo que corresponda al mes indicado abajo y a un comercial de tienda. Ignora lo demás (condiciones legales, ejemplos, saludos…).',
+      '5. Cada objetivo del texto = un elemento de "objetivos". Si el texto da un mismo premio para varias condiciones, créalas como objetivos separados.',
+      '6. Números sin símbolo ni separador de miles (40000, no "40.000 €"). Porcentajes sin el símbolo %.',
       '',
       'FORMATO DEL JSON',
       '{',
@@ -342,34 +346,38 @@
       '    "alternativa": "A"',
       '  } ],',
       '  "incentivos_por_unidad": [ { "modelos": ["Modelo X"], "importes": [50, 70, 100] } ],',
-      '  "comisiones": [ { "nombre": "…", "ambito": { "grupos": ["…"] }, "porcentaje": 2 } ]',
+      '  "comisiones": [ { "nombre": "…", "ambito": { "grupos": ["…"] }, "porcentaje": 2 } ],',
+      '  "notas": ["suposiciones o dudas, una frase cada una"]',
       '}',
       '',
-      'SIGNIFICADO DE CADA CAMPO',
-      '- grupos: categorías de producto del comunicado (gamas, wearables, móviles…). En "modelos" pon los nombres exactos que cite el comunicado. Si no lista modelos por categoría, deja "modelos": [].',
-      '- metrica: "unidades" si la meta es un número de aparatos vendidos; "importe" si la meta es dinero vendido (€).',
-      '- ambito: qué ventas cuentan para ese objetivo (un grupo, modelos concretos o todo).',
-      '- meta: número a alcanzar (unidades o euros, sin símbolo).',
-      '- pago.recompensa: € que se cobran al llegar al 100% de la meta.',
-      '- pago.desde_pct: % mínimo de la meta para cobrar algo (normalmente 80). Por debajo cobras 0 €.',
-      '- pago.tipo "lineal": cobras recompensa × tu % de cumplimiento (con 90% cobras el 90%), desde "desde_pct" hasta "tope_pct". "fijo": cobras toda la recompensa en cuanto llegas a "desde_pct". "escalones": usa la lista "escalones" (desde qué % cobras qué % de la recompensa).',
-      '- pago.tope_pct: máximo % de cumplimiento que se paga (p. ej. 140). Sin tope: 100.',
-      '- requiere: este objetivo solo paga si ya has llegado al mínimo ("desde_pct") de los objetivos que indiques.',
-      '- alternativa: dos o más objetivos con la misma letra son excluyentes: solo cuenta el que más paga ("cobras por uno de los dos"). Los demás objetivos se suman entre sí.',
-      '- incentivos_por_unidad: pagan desde la primera unidad vendida. "importes" van en orden (1.ª, 2.ª, 3.ª unidad…) y el último se repite para las siguientes. Un importe único = ese € por cada unidad.',
-      '- comisiones: porcentaje sobre el dinero vendido del ámbito.',
-      '- Los "id" van en minúsculas, sin espacios ni tildes.',
+      'CÓMO DECIDIR CADA CAMPO',
+      '- metrica: "unidades" si la meta es un número de aparatos (sell-out en unidades); "importe" si la meta es dinero vendido (€, sell-out en valor, facturación).',
+      '- ambito: qué ventas cuentan. Una categoría o gama → { "grupos": [id] }; modelos concretos → { "modelos": [...] }; todo lo vendido → { "todo": true }.',
+      '- grupos: las categorías o gamas del texto (alta/media/entrada, móviles/wearables/tablets…). En "modelos" pon los nombres exactos que cite el texto. Si no hay lista, deja "modelos": [].',
+      '- meta: el número a alcanzar (unidades o euros).',
+      '- pago.recompensa: los € que se cobran al llegar al 100% de la meta (o el premio total si es todo-o-nada).',
+      '- pago.desde_pct: % mínimo de la meta para empezar a cobrar ("a partir del 80%"). Si no se dice: 80 en lineal y escalones; 100 en fijo.',
+      '- pago.tipo: "lineal" = cobras tu % de cumplimiento × recompensa (90% de la meta → 90% del premio) hasta "tope_pct". "fijo" = cobras todo el premio en cuanto llegas a "desde_pct". "escalones" = una tabla de tramos (cada tramo: desde qué % y qué % del premio se paga).',
+      '- pago.tope_pct: máximo % de cumplimiento que se paga ("hasta el 140%"). Si no hay tope: 100.',
+      '- Objetivos independientes se SUMAN. Si el texto dice "uno de los dos", "el mayor", "o bien", "no acumulable" → ponles la misma letra en "alternativa".',
+      '- requiere: úsalo si un premio solo se cobra cuando antes se ha alcanzado otro objetivo ("para cobrar el bonus de wearables hay que llegar al 100% del total").',
+      '- incentivos_por_unidad: premios por cada unidad vendida, desde la primera. "importes" en orden (1.ª, 2.ª, 3.ª unidad…); el último importe se repite para las siguientes. Si solo pagan a partir de la unidad N, pon ceros en las N-1 primeras (ej. a partir de la 11.ª cobras 15 €: [0,0,0,0,0,0,0,0,0,0,15]).',
+      '- comisiones: un % sobre el dinero vendido de ese ámbito.',
+      '- Los "id" van en minúsculas, sin espacios ni tildes y sin repetirse.',
+      '- Si algo del texto NO cabe en este formato, hazlo encajar lo mejor posible y describe en "notas" lo que no has podido reflejar.',
       '',
       'EJEMPLO A (objetivos en unidades por gamas, con incentivos por unidad):',
       JSON.stringify(EXAMPLE_A, null, 1),
       '',
-      'EJEMPLO B (objetivos en dinero, categorías, alternativa, requisito y comisión):',
+      'EJEMPLO B (objetivos en dinero, categorías, alternativa, requisito, comisión y notas):',
       JSON.stringify(EXAMPLE_B, null, 1),
       '',
       'MES: ' + (o.monthLabel || ''),
-      models.length ? 'MIS MODELOS ACTUALES EN LA APP (usa estos nombres si coinciden): ' + models.join(', ') : 'MIS MODELOS ACTUALES EN LA APP: (ninguno todavía)',
+      models.length ? 'MIS MODELOS ACTUALES EN LA APP (usa estos nombres exactos si coinciden): ' + models.join(', ') : 'MIS MODELOS ACTUALES EN LA APP: (ninguno todavía)',
       '',
-      'COMUNICADO DE OBJETIVOS (pégalo justo debajo de esta línea):',
+      'RECUERDA: responde ya, sin preguntas, solo con el bloque ```json.',
+      '',
+      'TEXTO DE OBJETIVOS E INCENTIVOS (empieza justo debajo de esta línea):',
       ''
     ].join('\n');
   }

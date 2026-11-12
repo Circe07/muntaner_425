@@ -225,3 +225,6 @@ a.ag-btn--primary,a.ag-btn--primary:visited{color:var(--ink-inverse)}
 .steps li{counter-increment:paso;position:relative;padding-left:36px}
 .steps li::before{content:counter(paso);position:absolute;left:0;top:0;width:26px;height:26px;border-radius:50%;display:grid;place-items:center;background:var(--accent-soft);color:var(--accent);font-weight:700;font-size:13px}
 #pd-title:focus{outline:none}
+
+.pd-notes{margin:var(--space-3) 0;padding:var(--space-3);border-radius:var(--radius-md);background:var(--accent-soft);border:1px solid var(--glass-edge);font-size:13px}
+.pd-notes ul{margin:var(--space-2) 0 0;padding-left:var(--space-5);display:grid;gap:4px}

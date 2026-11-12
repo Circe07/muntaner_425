@@ -345,6 +345,8 @@ function startReview(plan, note, warnings, replaceDefault) {
   $('pd-note').textContent = note;
   const warn = $('pd-warnings');
   warn.innerHTML = warnings.map(x => `<li>${esc(x)}</li>`).join(''); warn.hidden = !warnings.length;
+  const notes = plan.notes || [];
+  $('pd-notes-list').innerHTML = notes.map(x => `<li>${esc(x)}</li>`).join(''); $('pd-notes').hidden = !notes.length;
   const hasModels = plan.groups.some(g => g.models.length);
   $('pd-models-wrap').hidden = !hasModels;
   $('pd-models').checked = hasModels && replaceDefault;
