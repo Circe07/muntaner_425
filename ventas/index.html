@@ -46,6 +46,7 @@
           <button type="button" class="ag-btn ag-btn--glass" id="qty-plus" aria-label="Añadir una unidad">+</button>
         </div>
       </div>
+      <label id="amount-wrap" hidden>Importe total de la venta (€) <input class="ag-input body" type="number" id="sale-amount" min="0" step="any" inputmode="decimal" placeholder="Ej. 349"></label>
       <button class="ag-btn ag-btn--primary body" id="sale-submit" disabled>Añadir venta</button>
     </form>
     <p class="hint footnote" id="no-models" hidden>Primero añade algún modelo en “Modelos”.</p>
@@ -55,20 +56,21 @@
     <h2 class="title3">Objetivos y progreso</h2>
     <div id="gamas" class="gamas"></div>
     <div id="inc-total" class="inc-total"></div>
+    <details class="howto" id="plan-howto" hidden><summary>Cómo se calcula tu incentivo</summary><ul class="plan-lines" id="plan-lines"></ul></details>
     <div id="goal-banner" class="banner" hidden>Este mes aún no tiene objetivo. <button class="ag-btn ag-btn--primary body" data-open-goals>Introducir objetivo</button></div>
-    <button class="ag-btn ag-btn--glass body" id="edit-goals" data-open-goals>Configurar objetivos de este mes</button>
+    <button class="ag-btn ag-btn--glass body" id="edit-goals" data-open-goals>Objetivos de este mes</button>
   </section>
 
   <section class="card ag-card ag-grain" id="unit-card" hidden>
-    <h2 class="title3">Incentivos por unidad <span class="badge" id="unit-total"></span></h2>
-    <table id="unit-table"><thead><tr><th>Modelo</th><th class="n">Uds.</th><th class="n c-imp">Importes (1ª / 2ª / …)</th><th class="n">Sig.</th><th class="n">Cobras</th></tr></thead><tbody></tbody></table>
+    <h2 class="title3">Por unidad y comisiones <span class="badge" id="unit-total"></span></h2>
+    <table id="unit-table"><thead><tr><th>Concepto</th><th class="n">Vendido</th><th class="n c-imp">Regla</th><th class="n">Sig.</th><th class="n">Cobras</th></tr></thead><tbody></tbody></table>
     <p class="hint footnote banner-text" id="unit-warn" hidden></p>
   </section>
 
   <section class="card ag-card ag-grain">
     <h2 class="title3">Historial de meses</h2>
-    <table id="history"><thead><tr><th>Mes</th><th>Alta</th><th>Media</th><th>Baja</th><th>Incentivo</th></tr></thead><tbody></tbody></table>
-    <p class="hint footnote">Cada celda: vendidas / objetivo (% conseguido). Pulsa un mes para verlo.</p>
+    <table id="history"><thead><tr><th>Mes</th><th>Objetivos</th><th>Incentivo</th></tr></thead><tbody></tbody></table>
+    <p class="hint footnote">Porcentaje conseguido de cada objetivo. Pulsa un mes para verlo.</p>
   </section>
 
   <div class="two">
@@ -78,25 +80,26 @@
     </section>
     <section class="card ag-card ag-grain">
       <h2 class="title3">Ventas por modelo</h2>
-      <table id="by-model"><thead><tr><th>Modelo</th><th>Gama</th><th class="n">Uds.</th></tr></thead><tbody></tbody></table>
+      <table id="by-model"><thead><tr><th>Modelo</th><th>Grupo</th><th class="n">Uds.</th></tr></thead><tbody></tbody></table>
     </section>
   </div>
 
   <section class="card ag-card ag-grain">
     <h2 class="title3">Ventas registradas <span id="total" class="badge"></span></h2>
-    <table id="sales"><thead><tr><th>Fecha</th><th>Modelo</th><th>Gama</th><th class="n">Uds.</th><th></th></tr></thead><tbody></tbody></table>
+    <table id="sales"><thead><tr><th>Fecha</th><th>Modelo</th><th>Grupo</th><th class="n">Uds.</th><th></th></tr></thead><tbody></tbody></table>
   </section>
 
   <section class="card ag-card ag-grain">
     <h2 class="title3">Modelos</h2>
     <form id="model-form">
       <label>Nombre <input class="ag-input body" id="model-name" required placeholder="Ej. Modelo X"></label>
-      <label>Gama
-        <select class="ag-input body" id="model-gama"><option value="alta">Alta</option><option value="media">Media</option><option value="baja">Baja</option></select>
+      <label>Grupo
+        <select class="ag-input body" id="model-gama"></select>
       </label>
       <button class="ag-btn ag-btn--primary body">Añadir modelo</button>
     </form>
     <ul id="models" class="models"></ul>
+    <button class="ag-btn ag-btn--glass body" type="button" id="models-clear" hidden>Vaciar la lista de modelos</button>
   </section>
 
   <section class="card ag-card ag-grain" id="install-box" hidden>
@@ -128,29 +131,66 @@
     <button class="ag-btn ag-btn--glass body" id="logout">Cerrar sesión</button>
   </section>
 </main>
-<dialog id="goal-dialog" class="ag-grain">
-  <form method="dialog" id="goals-form">
-    <h2 id="goal-title" class="title3">Objetivos</h2>
-    <p class="hint footnote">Por gama: unidades objetivo, incentivo al 100% y tope de cumplimiento. Por debajo del 80% no se cobra; desde el 80% se cobra lineal (tu % × incentivo) hasta el tope.</p>
-    <p class="hint footnote" id="goal-prefill" hidden></p>
-    <div class="gbox"><strong class="headline">Alta</strong><div class="grid3">
-      <label>Unidades <input class="ag-input body" type="number" min="0" id="goal-alta" required></label>
-      <label>Incentivo 100% (€) <input class="ag-input body" type="number" min="0" step="any" id="inc-alta"></label>
-      <label>Tope (%) <input class="ag-input body" type="number" min="100" step="any" id="max-alta" placeholder="100"></label></div></div>
-    <div class="gbox"><strong class="headline">Media</strong><div class="grid3">
-      <label>Unidades <input class="ag-input body" type="number" min="0" id="goal-media" required></label>
-      <label>Incentivo 100% (€) <input class="ag-input body" type="number" min="0" step="any" id="inc-media"></label>
-      <label>Tope (%) <input class="ag-input body" type="number" min="100" step="any" id="max-media" placeholder="100"></label></div></div>
-    <div class="gbox"><strong class="headline">Baja</strong><div class="grid3">
-      <label>Unidades <input class="ag-input body" type="number" min="0" id="goal-baja" required></label>
-      <label>Incentivo 100% (€) <input class="ag-input body" type="number" min="0" step="any" id="inc-baja"></label>
-      <label>Tope (%) <input class="ag-input body" type="number" min="100" step="any" id="max-baja" placeholder="100"></label></div></div>
-    <div class="gbox"><strong class="headline">Incentivos por unidad</strong>
-      <p class="hint footnote">Se cobran desde la primera unidad. Importes en orden (1ª, 2ª, 3ª…); el último se repite para las siguientes.</p>
-      <div id="unit-rules"></div>
-      <button class="ag-btn ag-btn--glass body" type="button" id="add-rule">Añadir modelo</button></div>
-    <div class="row"><button class="ag-btn ag-btn--glass body" type="button" id="goal-cancel">Ahora no</button><button class="ag-btn ag-btn--primary body" value="ok">Guardar</button></div>
-  </form>
+<dialog id="plan-dialog" class="ag-grain">
+  <div class="pd-head"><h2 id="pd-title" class="title3" tabindex="-1">Objetivos</h2><button type="button" class="del" id="pd-x" aria-label="Cerrar">✕</button></div>
+
+  <section id="pd-start">
+    <p class="hint footnote">Elige cómo poner los objetivos de este mes.</p>
+    <div class="choices">
+      <button type="button" class="choice choice--main" id="pd-go-ia"><strong>Con mi IA (recomendado)</strong><span>Pegas el correo de objetivos en Gemini, ChatGPT o la IA que uses y la app lee el resultado. Vale para cualquier marca: unidades, dinero, categorías, escalones…</span></button>
+      <button type="button" class="choice" id="pd-go-repeat" hidden><strong>Repetir el mes anterior</strong><span id="pd-repeat-desc"></span></button>
+      <button type="button" class="choice" id="pd-go-edit" hidden><strong>Ajustar los objetivos de este mes</strong><span>Cambia las metas y las recompensas del plan actual.</span></button>
+      <button type="button" class="choice" id="pd-go-manual"><strong>A mano (sencillo)</strong><span>Tres gamas —alta, media y baja— con unidades, incentivo y tope.</span></button>
+    </div>
+  </section>
+
+  <section id="pd-ia" hidden>
+    <ol class="steps">
+      <li><strong>Copia las instrucciones</strong> para la IA.<button type="button" class="ag-btn ag-btn--primary body" id="pd-copy">Copiar instrucciones</button>
+        <textarea class="ag-input" id="pd-fallback" rows="5" readonly hidden aria-label="Instrucciones para copiar"></textarea></li>
+      <li><strong>Pégalas en tu IA</strong> y, justo debajo, pega el correo o comunicado de objetivos.
+        <span class="ai-links">Abrir: <a href="https://gemini.google.com/app" target="_blank" rel="noopener">Gemini</a> · <a href="https://chatgpt.com/" target="_blank" rel="noopener">ChatGPT</a> · <a href="https://claude.ai/new" target="_blank" rel="noopener">Claude</a></span></li>
+      <li><strong>Si te hace preguntas, respóndelas.</strong> Cuando te dé el resultado (un bloque de código), cópialo y pégalo aquí:
+        <textarea class="ag-input" id="pd-paste" rows="6" placeholder="Pega aquí la respuesta de tu IA" spellcheck="false" autocapitalize="none"></textarea></li>
+    </ol>
+    <ul class="pd-errors" id="pd-errors" hidden></ul>
+    <div class="row"><button type="button" class="ag-btn ag-btn--glass body" data-back>Volver</button><button type="button" class="ag-btn ag-btn--primary body" id="pd-review-btn">Revisar</button></div>
+    <p class="hint footnote">Tu correo solo lo ve tu IA: la app no lo envía a ningún sitio.</p>
+  </section>
+
+  <section id="pd-review" hidden>
+    <p class="hint footnote" id="pd-note"></p>
+    <ul class="pd-warnings" id="pd-warnings" hidden></ul>
+    <div id="pd-edit" class="oedit"></div>
+    <h3 class="subtitle">Así se calculará</h3>
+    <ul class="plan-lines" id="pd-lines"></ul>
+    <label class="check" id="pd-models-wrap" hidden><input type="checkbox" id="pd-models"> <span>Sustituir mi lista de modelos por la de este plan (recomendado si cambias de marca)</span></label>
+    <div class="row"><button type="button" class="ag-btn ag-btn--glass body" data-back>Volver</button><button type="button" class="ag-btn ag-btn--primary body" id="pd-apply">Aplicar objetivos</button></div>
+  </section>
+
+  <section id="pd-manual" hidden>
+    <form method="dialog" id="goals-form">
+      <p class="hint footnote">Por gama: unidades objetivo, incentivo al 100% y tope de cumplimiento. Por debajo del 80% no se cobra; desde el 80% se cobra lineal (tu % × incentivo) hasta el tope.</p>
+      <p class="hint footnote" id="goal-prefill" hidden></p>
+      <div class="gbox"><strong class="headline">Alta</strong><div class="grid3">
+        <label>Unidades <input class="ag-input body" type="number" min="0" id="goal-alta" required></label>
+        <label>Incentivo 100% (€) <input class="ag-input body" type="number" min="0" step="any" id="inc-alta"></label>
+        <label>Tope (%) <input class="ag-input body" type="number" min="100" step="any" id="max-alta" placeholder="100"></label></div></div>
+      <div class="gbox"><strong class="headline">Media</strong><div class="grid3">
+        <label>Unidades <input class="ag-input body" type="number" min="0" id="goal-media" required></label>
+        <label>Incentivo 100% (€) <input class="ag-input body" type="number" min="0" step="any" id="inc-media"></label>
+        <label>Tope (%) <input class="ag-input body" type="number" min="100" step="any" id="max-media" placeholder="100"></label></div></div>
+      <div class="gbox"><strong class="headline">Baja</strong><div class="grid3">
+        <label>Unidades <input class="ag-input body" type="number" min="0" id="goal-baja" required></label>
+        <label>Incentivo 100% (€) <input class="ag-input body" type="number" min="0" step="any" id="inc-baja"></label>
+        <label>Tope (%) <input class="ag-input body" type="number" min="100" step="any" id="max-baja" placeholder="100"></label></div></div>
+      <div class="gbox"><strong class="headline">Incentivos por unidad</strong>
+        <p class="hint footnote">Se cobran desde la primera unidad. Importes en orden (1ª, 2ª, 3ª…); el último se repite para las siguientes.</p>
+        <div id="unit-rules"></div>
+        <button class="ag-btn ag-btn--glass body" type="button" id="add-rule">Añadir modelo</button></div>
+      <div class="row"><button class="ag-btn ag-btn--glass body" type="button" data-back>Volver</button><button class="ag-btn ag-btn--primary body" value="ok">Guardar</button></div>
+    </form>
+  </section>
 </dialog>
 <dialog id="auth-dialog" class="ag-grain">
   <form id="auth-form">
@@ -167,6 +207,7 @@
 <div id="toast" class="ag-toast toast" role="status" aria-live="polite" hidden><p class="ag-toast__message body" id="toast-msg"></p><button type="button" class="ag-toast__action" id="toast-undo">Deshacer</button></div>
 <script src="config.js"></script>
 <script src="vendor/supabase.js"></script>
+<script src="plan.js"></script>
 <script src="app.js"></script>
 </body>
 </html>

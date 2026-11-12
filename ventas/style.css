@@ -179,3 +179,49 @@ a.ag-btn--primary,a.ag-btn--primary:visited{color:var(--ink-inverse)}
 .pwbox{margin:var(--space-3) 0;border:1px solid var(--glass-edge);border-radius:var(--radius-md);background:var(--surface);padding:var(--space-2) var(--space-3)}
 .pwbox summary{cursor:pointer;font-weight:600;padding:var(--space-2) 0;color:var(--accent)}
 .pwbox form{display:grid;gap:var(--space-3);padding:var(--space-2) 0 var(--space-3)}
+
+/* ---- colores de grupo y objetivos generales ---- */
+:root{--g0:var(--accent);--g1:var(--success);--g2:var(--warning);--g3:var(--danger);--g4:var(--accent-pressed);--g5:var(--ink-secondary);--g6:var(--ink-tertiary);--g7:var(--focus-ring)}
+.gama .note{margin-top:var(--space-2);font-size:12px;color:var(--ink-secondary)}
+.gama .note.ok{color:var(--success)}.gama .note.no{color:var(--danger)}
+.gama.loser{opacity:.72}
+.amt{color:var(--ink-secondary);font-size:11px;white-space:nowrap}
+.howto{margin:var(--space-3) 0;border:1px solid var(--glass-edge);border-radius:var(--radius-md);background:var(--surface);padding:var(--space-2) var(--space-3)}
+.howto summary{cursor:pointer;font-weight:600;padding:var(--space-2) 0;color:var(--accent)}
+.plan-lines{margin:0;padding-left:var(--space-5);display:grid;gap:var(--space-2);font-size:13px;color:var(--ink-secondary)}
+.chip{display:inline-block;margin:2px 4px 2px 0;padding:1px 8px;border-radius:var(--radius-full);background:var(--accent-soft);font-size:12px;white-space:nowrap}
+.chip b{color:var(--ink)}
+#amount-wrap{flex:1 1 180px}
+
+/* ---- diálogo de objetivos ---- */
+#plan-dialog{max-width:620px}
+.pd-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:var(--space-3)}
+.choices{display:grid;gap:var(--space-3);margin-top:var(--space-3)}
+.choice{display:grid;gap:4px;text-align:left;width:100%;padding:var(--space-4);border:1px solid var(--glass-edge);border-radius:var(--radius-md);background:var(--surface);box-shadow:inset 0 1px 0 0 var(--glass-highlight);color:var(--ink);font:inherit;cursor:pointer;transition:transform 160ms,background-color 160ms}
+.choice:active{transform:scale(.985)}.choice:hover{background:var(--accent-soft)}
+.choice:focus-visible{outline:2px solid var(--focus-ring);outline-offset:2px}
+.choice span{font-size:13px;color:var(--ink-secondary)}
+.choice--main{border-color:var(--accent);background:var(--accent-soft)}
+.steps{margin:0 0 var(--space-3);padding-left:var(--space-5);display:grid;gap:var(--space-4)}
+.steps li{display:grid;gap:var(--space-2)}
+.steps textarea,#pd-fallback{width:100%;min-height:96px;height:auto;padding:var(--space-3);resize:vertical;font:13px/1.4 ui-monospace,Menlo,monospace}
+#pd-paste{font-family:var(--font-sans);font-size:14px}
+.ai-links a{color:var(--accent);font-weight:600}
+.pd-errors,.pd-warnings{margin:var(--space-3) 0;padding:var(--space-3) var(--space-3) var(--space-3) var(--space-6);border-radius:var(--radius-md);font-size:13px;display:grid;gap:4px}
+.pd-errors{background:color-mix(in srgb,var(--danger) 14%,var(--surface-strong));color:var(--ink);border:1px solid var(--danger)}
+.pd-warnings{background:color-mix(in srgb,var(--warning) 16%,var(--surface-strong));border:1px solid var(--warning)}
+.oedit{display:grid;gap:var(--space-3);margin:var(--space-3) 0}
+.orow{display:grid;grid-template-columns:1.2fr 1fr 1fr;gap:var(--space-2);align-items:end;padding:var(--space-3);border:1px solid var(--glass-edge);border-radius:var(--radius-md);background:var(--surface)}
+.oname{display:grid;gap:2px}.oname small{color:var(--ink-secondary);font-size:12px}
+.subtitle{margin:var(--space-4) 0 var(--space-2);font-size:14px}
+.check{flex-direction:row;align-items:flex-start;gap:var(--space-2);margin:var(--space-3) 0;color:var(--ink)}
+.check input{margin-top:3px;width:18px;height:18px;flex:none}
+@media(max-width:480px){.orow{grid-template-columns:1fr 1fr}.oname{grid-column:1/-1}}
+#models-clear{margin-top:var(--space-3)}
+#history td:nth-child(2){white-space:normal}
+
+/* pasos numerados del asistente de IA */
+.steps{list-style:none;counter-reset:paso;padding-left:0}
+.steps li{counter-increment:paso;position:relative;padding-left:36px}
+.steps li::before{content:counter(paso);position:absolute;left:0;top:0;width:26px;height:26px;border-radius:50%;display:grid;place-items:center;background:var(--accent-soft);color:var(--accent);font-weight:700;font-size:13px}
+#pd-title:focus{outline:none}
