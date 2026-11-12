@@ -45,8 +45,8 @@ function save() { try { localStorage.setItem(KEY, JSON.stringify(state)); } catc
 const hasGoals = m => !!state.goals[m];
 const eur = n => (Math.round(n * 100) / 100).toLocaleString('es-ES', { maximumFractionDigits: 2 }) + ' €';
 const incOf = (g, x) => +((g.inc || {})[x]) || 0;
-// Incentivo cobrado: <80% → 0; ≥80% → 80% del importe; ≥100% → 100%.
-const earned = (sold, goal, inc) => !goal ? 0 : sold >= goal ? inc : sold >= Math.ceil(goal * 0.8) ? inc * 0.8 : 0;
+// Incentivo cobrado: <80% → 0; del 80% al 99% → proporcional (cumplimiento × importe); ≥100% → importe completo.
+const earned = (sold, goal, inc) => !goal ? 0 : sold >= goal ? inc : sold >= Math.ceil(goal * 0.8) ? inc * sold / goal : 0;
 const goalsFor = m => state.goals[m] || { alta: 0, media: 0, baja: 0 };
 const MESES = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
 const monthName = m => { const [y, n] = m.split('-'); return `${MESES[+n - 1]} ${y}`; };
@@ -79,7 +79,7 @@ function render() {
       <div class="bar"><i style="width:${fill}%"></i>${goal ? `<b style="left:80%"><span>80%</span></b>` : ''}</div>
       <div class="miss"><span>Hasta 80% (${t80}): <strong class="${to80 || !goal ? '' : 'done'}">${goal ? (to80 || '✓') : '–'}</strong></span>
       <span>Hasta 100%: <strong class="${to100 || !goal ? '' : 'done'}">${goal ? (to100 || '✓') : '–'}</strong></span></div>
-      ${inc ? `<div class="inc">Incentivo ahora: <strong>${eur(earned(sold, goal, inc))}</strong><br>al 80%: ${eur(inc * 0.8)} · al 100%: ${eur(inc)}</div>` : ''}
+      ${inc ? `<div class="inc">Incentivo ahora: <strong>${eur(earned(sold, goal, inc))}</strong><br>desde el 80%: ${eur(inc * 0.8)} · al 100%: ${eur(inc)}</div>` : ''}
     </div>`;
   }).join('');
   // total de incentivo
@@ -121,12 +121,12 @@ function render() {
   // listado de ventas
   $('total').textContent = sales.reduce((a, s) => a + s.qty, 0) + ' uds.';
   $('sales').tBodies[0].innerHTML = sales.length
-    ? sales.map(s => `<tr><td>${s.date.split('-').reverse().join('/')}</td><td>${esc(s.name)}</td><td><span class="tag ${s.gama}">${LABEL[s.gama]}</span></td><td class="n">${s.qty}</td><td class="n"><button class="del" data-sale="${s.id}" title="Borrar">✕</button></td></tr>`).join('')
+    ? sales.map(s => `<tr><td>${s.date.split('-').reverse().join('/')}</td><td>${esc(s.name)}</td><td><span class="tag ${s.gama}">${LABEL[s.gama]}</span></td><td class="n">${s.qty}</td><td class="n"><button class="del" aria-label="Borrar venta" data-sale="${s.id}" title="Borrar">✕</button></td></tr>`).join('')
     : '<tr><td colspan="5" class="empty">Sin ventas este mes</td></tr>';
 
   // gestión de modelos
   $('models').innerHTML = state.models.length
-    ? state.models.map(m => `<li><span>${esc(m.name)}</span><span><select data-gama="${m.id}">${GAMAS.map(g => `<option value="${g}"${g === m.gama ? ' selected' : ''}>${LABEL[g]}</option>`).join('')}</select> <button class="del" data-model="${m.id}" title="Quitar modelo">✕</button></span></li>`).join('')
+    ? state.models.map(m => `<li><span>${esc(m.name)}</span><span><select class="ag-input footnote" data-gama="${m.id}">${GAMAS.map(g => `<option value="${g}"${g === m.gama ? ' selected' : ''}>${LABEL[g]}</option>`).join('')}</select> <button class="del" aria-label="Quitar modelo" data-model="${m.id}" title="Quitar modelo">✕</button></span></li>`).join('')
     : '<li class="empty">No hay modelos todavía</li>';
 }
 

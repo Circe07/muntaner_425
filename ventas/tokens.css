@@ -1,0 +1,83 @@
+/* Aleh Glass — generado desde tokens.json (no editar a mano) */
+:root {
+  color-scheme: light dark;
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-7: 32px;
+  --space-8: 40px;
+  --radius-xs: 6px;
+  --radius-sm: 10px;
+  --radius-md: 14px;
+  --radius-lg: 20px;
+  --radius-xl: 28px;
+  --radius-2xl: 36px;
+  --radius-full: 999px;
+  --blur-sm: 12px;
+  --blur-md: 20px;
+  --blur-lg: 32px;
+  --grain-subtle: 0.035;
+  --grain-visible: 0.06;
+  --font-sans: "Plus Jakarta Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  --font-mono: ui-monospace, "SF Mono", "Menlo", "Cascadia Code", monospace;
+  --canvas: #F2F2F7;
+  --canvas-raised: #FFFFFF;
+  --surface: rgba(255,255,255,0.52);
+  --surface-strong: rgba(255,255,255,0.76);
+  --surface-clear: rgba(255,255,255,0.20);
+  --glass-edge: rgba(0,0,0,0.07);
+  --glass-highlight: rgba(255,255,255,0.78);
+  --ink: #1C1C1E;
+  --ink-secondary: #6E6E73;
+  --ink-tertiary: #78787D;
+  --ink-inverse: #FFFFFF;
+  --accent: #4070AB;
+  --accent-pressed: #35568B;
+  --accent-soft: rgba(64,112,171,0.16);
+  --success: #3C7A5D;
+  --warning: #85662C;
+  --danger: #A3585C;
+  --focus-ring: #0B5FCE;
+  --shadow-glass-sm: 0 1px 2px rgba(0,0,0,0.06), 0 4px 12px rgba(0,0,0,0.08);
+  --shadow-glass-md: 0 8px 24px rgba(0,0,0,0.12), 0 2px 6px rgba(0,0,0,0.08);
+  --shadow-glass-lg: 0 24px 60px rgba(0,0,0,0.18), 0 8px 20px rgba(0,0,0,0.1);
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --canvas: #000000;
+    --canvas-raised: #1C1C1E;
+    --surface: rgba(40,40,42,0.52);
+    --surface-strong: rgba(40,40,42,0.76);
+    --surface-clear: rgba(60,60,62,0.22);
+    --glass-edge: rgba(255,255,255,0.12);
+    --glass-highlight: rgba(255,255,255,0.18);
+    --ink: #F5F5F7;
+    --ink-secondary: #AEAEB2;
+    --ink-tertiary: #8E8E93;
+    --ink-inverse: #0B0B0C;
+    --accent: #84B7EE;
+    --accent-pressed: #679FE9;
+    --accent-soft: rgba(132,183,238,0.22);
+    --success: #6DD0A1;
+    --warning: #E9BC69;
+    --danger: #F2A5A1;
+    --focus-ring: #6AB2FF;
+    --shadow-glass-sm: 0 1px 2px rgba(0,0,0,0.5), 0 4px 16px rgba(0,0,0,0.55);
+    --shadow-glass-md: 0 8px 28px rgba(0,0,0,0.6), 0 2px 8px rgba(0,0,0,0.4);
+    --shadow-glass-lg: 0 24px 70px rgba(0,0,0,0.7), 0 8px 24px rgba(0,0,0,0.5);
+  }
+}
+.display { font-family: var(--font-sans); font-size: 34px; line-height: 41px; font-weight: 700; }
+.title1 { font-family: var(--font-sans); font-size: 28px; line-height: 34px; font-weight: 700; }
+.title2 { font-family: var(--font-sans); font-size: 22px; line-height: 28px; font-weight: 700; }
+.title3 { font-family: var(--font-sans); font-size: 20px; line-height: 25px; font-weight: 600; }
+.headline { font-family: var(--font-sans); font-size: 17px; line-height: 22px; font-weight: 600; }
+.body { font-family: var(--font-sans); font-size: 17px; line-height: 22px; font-weight: 400; }
+.callout { font-family: var(--font-sans); font-size: 16px; line-height: 21px; font-weight: 400; }
+.subheadline { font-family: var(--font-sans); font-size: 15px; line-height: 20px; font-weight: 400; }
+.footnote { font-family: var(--font-sans); font-size: 13px; line-height: 18px; font-weight: 400; }
+.caption { font-family: var(--font-sans); font-size: 12px; line-height: 16px; font-weight: 400; }
+.caption-strong { font-family: var(--font-sans); font-size: 12px; line-height: 16px; font-weight: 600; }
