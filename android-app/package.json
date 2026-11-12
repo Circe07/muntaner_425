@@ -1,0 +1,11 @@
+{
+  "name": "ventas-mes-android",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Envoltorio Android (APK) de la web Ventas del mes: abre https://ventas-mes.vercel.app",
+  "dependencies": {
+    "@capacitor/android": "^8.6.0",
+    "@capacitor/cli": "^8.6.0",
+    "@capacitor/core": "^8.6.0"
+  }
+}

@@ -1,5 +1,7 @@
 'use strict';
 const KEY = 'ventas-mes-v1';
+const inApp = /VentasApp/.test(navigator.userAgent);          // dentro del APK de Android
+const isAndroid = /android/i.test(navigator.userAgent);
 const GAMAS = ['alta', 'media', 'baja'];
 const LABEL = { alta: 'Alta', media: 'Media', baja: 'Baja' };
 const $ = id => document.getElementById(id);
@@ -317,7 +319,12 @@ document.addEventListener('click', e => {
   }
 });
 
-$('export').onclick = () => {
+$('export').onclick = async () => {
+  if (inApp) {   // el visor de la app no descarga archivos: se copia al portapapeles
+    try { await navigator.clipboard.writeText(JSON.stringify(state, null, 2)); showToast('Copia en el portapapeles: pégala en una nota o mensaje', null); }
+    catch (e) { alert('No se pudo copiar. Tus datos están a salvo en tu cuenta.'); }
+    return;
+  }
   const a = document.createElement('a');
   a.href = URL.createObjectURL(new Blob([JSON.stringify(state, null, 2)], { type: 'application/json' }));
   a.download = `ventas-${new Date().toISOString().slice(0, 10)}.json`; a.click();
@@ -409,10 +416,11 @@ let deferredInstall = null;
 const standalone = () => matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
 const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
 function updateInstallUI() {
-  $('install-box').hidden = standalone();
-  $('install-btn').hidden = !deferredInstall;
+  $('install-box').hidden = inApp || standalone();
+  $('apk-link').hidden = $('apk-help').hidden = !isAndroid;
+  $('install-btn').hidden = !deferredInstall || isAndroid;
   $('install-ios').hidden = !(isIOS && !deferredInstall);
-  $('install-other').hidden = !!deferredInstall || isIOS;
+  $('install-other').hidden = !!deferredInstall || isIOS || isAndroid;
 }
 window.addEventListener('beforeinstallprompt', e => { e.preventDefault(); deferredInstall = e; updateInstallUI(); });
 window.addEventListener('appinstalled', () => { deferredInstall = null; updateInstallUI(); });

@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Ventas del mes</string>
+    <string name="title_activity_main">Ventas del mes</string>
+    <string name="package_name">app.ventasmes.panel</string>
+    <string name="custom_url_scheme">app.ventasmes.panel</string>
+</resources>

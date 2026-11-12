@@ -1,0 +1,16 @@
+{
+  "appId": "app.ventasmes.panel",
+  "appName": "Ventas del mes",
+  "webDir": "www",
+  "server": {
+    "url": "https://ventas-mes.vercel.app",
+    "cleartext": false,
+    "androidScheme": "https",
+    "errorPath": "error.html"
+  },
+  "android": {
+    "appendUserAgent": "VentasApp/1.0",
+    "allowMixedContent": false,
+    "backgroundColor": "#F2F2F7"
+  }
+}
