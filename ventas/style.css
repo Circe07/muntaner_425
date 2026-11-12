@@ -49,3 +49,8 @@ dialog form{flex-direction:column;align-items:stretch}dialog input{width:100%}
 #history tbody tr{cursor:pointer}#history tbody tr:hover{background:var(--bg)}#history .cur td:first-child{font-weight:700}
 .models select{padding:2px 6px;font-size:13px}
 .banner[hidden]{display:none}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+dialog{max-width:460px}
+.inc{margin-top:10px;padding-top:8px;border-top:1px dashed var(--line);font-size:13px;color:var(--mute)}
+.inc strong{color:var(--ink);font-size:16px}
+.inc-total{margin-bottom:12px;font-size:14px}.inc-total strong{font-size:18px}.inc-total[hidden]{display:none}

@@ -13,7 +13,7 @@ const SEED = [ // [nombre, gama]  (High=alta, Mid=media, Entry=baja)
   ['H600 Smart', 'baja'], ['PAD X8b', 'baja'], ['PAD X9a', 'baja'], ['H400 Smart', 'baja'], ['PAD X8a', 'baja'], ['X5c Plus', 'baja'],
 ];
 // Acumulado de noviembre 2026 hasta el 10/11 (sin desglosar por modelo)
-const NOV = { goals: { alta: 30, media: 85, baja: 100 }, sold: { alta: 3, media: 19, baja: 19 } };
+const NOV = { goals: { alta: 30, media: 85, baja: 100, inc: { alta: 400, media: 400, baja: 200 } }, sold: { alta: 3, media: 19, baja: 19 } };
 const nowMonth = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`; };
 let state = load();
 let month = nowMonth();
@@ -22,6 +22,11 @@ function load() {
   let s = null;
   try { s = JSON.parse(localStorage.getItem(KEY)); } catch (e) {}
   if (!s || !s.models) s = { models: [], sales: [], goals: {} };
+  if ((s.seedVersion || 0) >= 2 && (s.seedVersion || 0) < 3) {
+    const g = s.goals['2026-11'];
+    if (g && !g.inc && g.alta === 30 && g.media === 85 && g.baja === 100) g.inc = NOV.goals.inc;
+    s.seedVersion = 3;
+  }
   if ((s.seedVersion || 0) < 2) {
     const used = new Set(s.sales.map(x => x.modelId));
     s.models = s.models.filter(m => !(OLD_SEED.includes(m.name) && !used.has(m.id)));
@@ -30,7 +35,7 @@ function load() {
       s.goals['2026-11'] = NOV.goals;
       GAMAS.forEach(g => s.sales.push({ id: uid(), date: '2026-11-10', modelId: null, name: 'Acumulado hasta 10/11 (sin desglosar)', gama: g, qty: NOV.sold[g] }));
     }
-    s.seedVersion = 2;
+    s.seedVersion = 3;
   }
   return s;
 }
@@ -38,6 +43,10 @@ function save() { try { localStorage.setItem(KEY, JSON.stringify(state)); } catc
 
 // Objetivo de cada mes: se configura a mano, no se hereda del mes anterior.
 const hasGoals = m => !!state.goals[m];
+const eur = n => (Math.round(n * 100) / 100).toLocaleString('es-ES', { maximumFractionDigits: 2 }) + ' €';
+const incOf = (g, x) => +((g.inc || {})[x]) || 0;
+// Incentivo cobrado: <80% → 0; ≥80% → 80% del importe; ≥100% → 100%.
+const earned = (sold, goal, inc) => !goal ? 0 : sold >= goal ? inc : sold >= Math.ceil(goal * 0.8) ? inc * 0.8 : 0;
 const goalsFor = m => state.goals[m] || { alta: 0, media: 0, baja: 0 };
 const MESES = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
 const monthName = m => { const [y, n] = m.split('-'); return `${MESES[+n - 1]} ${y}`; };
@@ -63,14 +72,23 @@ function render() {
     const pct = goal ? Math.round(sold / goal * 100) : 0;
     const to80 = Math.max(0, t80 - sold), to100 = Math.max(0, goal - sold);
     const fill = goal ? Math.min(100, sold / goal * 100) : 0;
+    const inc = incOf(goals, g);
     return `<div class="gama" style="--c:var(--${g})">
       <h3>${LABEL[g]} <span>${goal ? pct + '%' : 'sin objetivo'}</span></h3>
       <div class="big">${sold} <small>/ ${goal} uds.</small></div>
       <div class="bar"><i style="width:${fill}%"></i>${goal ? `<b style="left:80%"><span>80%</span></b>` : ''}</div>
       <div class="miss"><span>Hasta 80% (${t80}): <strong class="${to80 || !goal ? '' : 'done'}">${goal ? (to80 || '✓') : '–'}</strong></span>
       <span>Hasta 100%: <strong class="${to100 || !goal ? '' : 'done'}">${goal ? (to100 || '✓') : '–'}</strong></span></div>
+      ${inc ? `<div class="inc">Incentivo ahora: <strong>${eur(earned(sold, goal, inc))}</strong><br>al 80%: ${eur(inc * 0.8)} · al 100%: ${eur(inc)}</div>` : ''}
     </div>`;
   }).join('');
+  // total de incentivo
+  const totals = GAMAS.reduce((t, g) => {
+    const sold = sales.filter(s => s.gama === g).reduce((a, s) => a + s.qty, 0), goal = +goals[g] || 0, inc = incOf(goals, g);
+    t.now += earned(sold, goal, inc); t.max += inc; return t;
+  }, { now: 0, max: 0 });
+  $('inc-total').hidden = !totals.max;
+  $('inc-total').innerHTML = `Incentivo conseguido ahora: <strong>${eur(totals.now)}</strong> de ${eur(totals.max)} posibles`;
 
   // historial
   const ms = new Set([...Object.keys(state.goals), ...state.sales.map(s => s.date.slice(0, 7)), nowMonth()]);
@@ -80,7 +98,9 @@ function render() {
       const sold = ss.filter(s => s.gama === x).reduce((a, s) => a + s.qty, 0), goal = +g[x] || 0;
       return `<td>${sold} / ${goal || '–'}${goal ? ` (${Math.round(sold / goal * 100)}%)` : ''}</td>`;
     }).join('');
-    return `<tr data-month="${m}" class="${m === month ? 'cur' : ''}"><td>${monthName(m)}</td>${cells}</tr>`;
+    let now = 0, max = 0;
+    GAMAS.forEach(x => { const sold = ss.filter(s => s.gama === x).reduce((a, s) => a + s.qty, 0); now += earned(sold, +g[x] || 0, incOf(g, x)); max += incOf(g, x); });
+    return `<tr data-month="${m}" class="${m === month ? 'cur' : ''}"><td>${monthName(m)}</td>${cells}<td>${max ? `${eur(now)} / ${eur(max)}` : '–'}</td></tr>`;
   }).join('');
 
   // por modelo (ventas del mes agrupadas por nombre; incluye modelos activos sin ventas)
@@ -144,12 +164,13 @@ $('model-form').onsubmit = e => {
 function openGoals() {
   const g = goalsFor(month);
   $('goal-title').textContent = 'Objetivos de ' + monthName(month);
-  GAMAS.forEach(x => $('goal-' + x).value = hasGoals(month) ? g[x] : '');
+  GAMAS.forEach(x => { $('goal-' + x).value = hasGoals(month) ? g[x] : ''; $('inc-' + x).value = hasGoals(month) ? incOf(g, x) : ''; });
   $('goal-dialog').showModal();
 }
 $('goals-form').onsubmit = e => {
   if (e.submitter && e.submitter.value !== 'ok') return;
   state.goals[month] = Object.fromEntries(GAMAS.map(g => [g, Math.max(0, parseInt($('goal-' + g).value, 10) || 0)]));
+  state.goals[month].inc = Object.fromEntries(GAMAS.map(g => [g, Math.max(0, parseFloat($('inc-' + g).value) || 0)]));
   save(); render();
 };
 $('goal-cancel').onclick = () => $('goal-dialog').close();
