@@ -40,3 +40,12 @@ th{font-size:12px;color:var(--mute);font-weight:600}.n{text-align:right}
 .badge{font-size:12px;background:var(--line);padding:2px 8px;border-radius:99px;font-weight:600}
 details{margin-top:6px}summary{cursor:pointer;color:var(--mute);font-size:13px;margin-bottom:10px}
 .file input{display:none}.file{display:inline-flex;border:1px solid var(--line);border-radius:8px;padding:8px 10px;cursor:pointer;margin-left:6px;color:var(--ink);vertical-align:middle}
+
+.banner{background:color-mix(in srgb,var(--baja) 18%,var(--card));border:1px solid var(--baja);border-radius:10px;padding:10px 12px;margin-bottom:12px;display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+dialog{border:1px solid var(--line);border-radius:12px;background:var(--card);color:var(--ink);padding:20px;max-width:340px;width:calc(100% - 32px)}
+dialog::backdrop{background:rgba(0,0,0,.5)}
+dialog form{flex-direction:column;align-items:stretch}dialog input{width:100%}
+.row{display:flex;gap:8px;justify-content:flex-end;margin-top:6px}
+#history tbody tr{cursor:pointer}#history tbody tr:hover{background:var(--bg)}#history .cur td:first-child{font-weight:700}
+.models select{padding:2px 6px;font-size:13px}
+.banner[hidden]{display:none}

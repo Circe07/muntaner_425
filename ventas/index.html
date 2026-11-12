@@ -31,15 +31,14 @@
   <section class="card">
     <h2>Objetivos y progreso</h2>
     <div id="gamas" class="gamas"></div>
-    <details>
-      <summary>Editar objetivos de este mes (unidades por gama)</summary>
-      <form id="goals-form">
-        <label>Alta <input type="number" min="0" id="goal-alta"></label>
-        <label>Media <input type="number" min="0" id="goal-media"></label>
-        <label>Baja <input type="number" min="0" id="goal-baja"></label>
-        <button class="primary">Guardar</button>
-      </form>
-    </details>
+    <div id="goal-banner" class="banner" hidden>Este mes aún no tiene objetivo. <button class="primary" data-open-goals>Introducir objetivo</button></div>
+    <button id="edit-goals" data-open-goals>Configurar objetivos de este mes</button>
+  </section>
+
+  <section class="card">
+    <h2>Historial de meses</h2>
+    <table id="history"><thead><tr><th>Mes</th><th>Alta</th><th>Media</th><th>Baja</th></tr></thead><tbody></tbody></table>
+    <p class="hint">Cada celda: vendidas / objetivo (% conseguido). Pulsa un mes para verlo.</p>
   </section>
 
   <div class="two">
@@ -77,6 +76,16 @@
     <label class="file">Restaurar copia <input type="file" id="import" accept="application/json"></label>
   </section>
 </main>
+<dialog id="goal-dialog">
+  <form method="dialog" id="goals-form">
+    <h2 id="goal-title">Objetivos</h2>
+    <p class="hint">Unidades a vender por gama este mes.</p>
+    <label>Alta <input type="number" min="0" id="goal-alta" required></label>
+    <label>Media <input type="number" min="0" id="goal-media" required></label>
+    <label>Baja <input type="number" min="0" id="goal-baja" required></label>
+    <div class="row"><button type="button" id="goal-cancel">Ahora no</button><button class="primary" value="ok">Guardar</button></div>
+  </form>
+</dialog>
 <script src="app.js"></script>
 </body>
 </html>

@@ -6,21 +6,33 @@ const $ = id => document.getElementById(id);
 const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
 const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
+const SEED = [ // [nombre, gama] — gamas orientativas, se pueden cambiar en "Modelos"
+  ['Magic Pad 4 12,3" OLED', 'alta'], ['Honor 600 5G 8+512', 'alta'],
+  ['Pad 10 12,1" 8GB (1602942)', 'media'], ['Pad 10 12,1" 8GB (1668755)', 'media'],
+  ['600 Lite 5G (1668633)', 'media'], ['600 Lite 5G (1668702)', 'media'], ['600 Lite 5G (1668634)', 'media'],
+  ['600 Smart 6,87" 5G', 'media'], ['Magic 8 Lite (1611266)', 'media'], ['Magic 8 Lite (1611264)', 'media'],
+  ['Pad X8B 11" 4RAM/64GB', 'baja'], ['Pad X8B 11" 6RAM/256GB', 'baja'],
+  ['400 Smart 4G (1604932)', 'baja'], ['400 Smart 4G (1604933)', 'baja'], ['X5C Plus 4G', 'baja'],
+];
+const nowMonth = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`; };
 let state = load();
-let month = new Date().toISOString().slice(0, 7);
+let month = nowMonth();
 
 function load() {
-  try { const s = JSON.parse(localStorage.getItem(KEY)); if (s && s.models) return s; } catch (e) {}
-  return { models: [], sales: [], goals: {} };
+  let s = null;
+  try { s = JSON.parse(localStorage.getItem(KEY)); } catch (e) {}
+  if (!s || !s.models) s = { models: [], sales: [], goals: {} };
+  if (!s.seeded && s.models.length === 0) s.models = SEED.map(([name, gama]) => ({ id: uid(), name, gama }));
+  s.seeded = true;
+  return s;
 }
 function save() { try { localStorage.setItem(KEY, JSON.stringify(state)); } catch (e) { alert('No se pudo guardar en el navegador.'); } }
 
-// Objetivo del mes; si no está definido usa el del último mes anterior que lo tenga.
-function goalsFor(m) {
-  if (state.goals[m]) return state.goals[m];
-  const prev = Object.keys(state.goals).filter(k => k < m).sort().pop();
-  return prev ? state.goals[prev] : { alta: 0, media: 0, baja: 0 };
-}
+// Objetivo de cada mes: se configura a mano, no se hereda del mes anterior.
+const hasGoals = m => !!state.goals[m];
+const goalsFor = m => state.goals[m] || { alta: 0, media: 0, baja: 0 };
+const MESES = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
+const monthName = m => { const [y, n] = m.split('-'); return `${MESES[+n - 1]} ${y}`; };
 const monthSales = () => state.sales.filter(s => s.date.startsWith(month)).sort((a, b) => b.date.localeCompare(a.date));
 
 function render() {
@@ -34,6 +46,8 @@ function render() {
 
   // gamas
   const goals = goalsFor(month);
+  $('goal-banner').hidden = hasGoals(month);
+  $('edit-goals').hidden = !hasGoals(month);
   $('gamas').innerHTML = GAMAS.map(g => {
     const sold = sales.filter(s => s.gama === g).reduce((a, s) => a + s.qty, 0);
     const goal = +goals[g] || 0;
@@ -49,7 +63,17 @@ function render() {
       <span>Hasta 100%: <strong class="${to100 || !goal ? '' : 'done'}">${goal ? (to100 || '✓') : '–'}</strong></span></div>
     </div>`;
   }).join('');
-  GAMAS.forEach(g => { const el = $('goal-' + g); if (document.activeElement !== el) el.value = goals[g] || 0; });
+
+  // historial
+  const ms = new Set([...Object.keys(state.goals), ...state.sales.map(s => s.date.slice(0, 7)), nowMonth()]);
+  $('history').tBodies[0].innerHTML = [...ms].sort().reverse().map(m => {
+    const g = goalsFor(m), ss = state.sales.filter(s => s.date.startsWith(m));
+    const cells = GAMAS.map(x => {
+      const sold = ss.filter(s => s.gama === x).reduce((a, s) => a + s.qty, 0), goal = +g[x] || 0;
+      return `<td>${sold} / ${goal || '–'}${goal ? ` (${Math.round(sold / goal * 100)}%)` : ''}</td>`;
+    }).join('');
+    return `<tr data-month="${m}" class="${m === month ? 'cur' : ''}"><td>${monthName(m)}</td>${cells}</tr>`;
+  }).join('');
 
   // por modelo (ventas del mes agrupadas por nombre; incluye modelos activos sin ventas)
   const map = new Map();
@@ -74,7 +98,7 @@ function render() {
 
   // gestión de modelos
   $('models').innerHTML = state.models.length
-    ? state.models.map(m => `<li><span>${esc(m.name)} <span class="tag ${m.gama}">${LABEL[m.gama]}</span></span><button class="del" data-model="${m.id}" title="Quitar modelo">✕</button></li>`).join('')
+    ? state.models.map(m => `<li><span>${esc(m.name)}</span><span><select data-gama="${m.id}">${GAMAS.map(g => `<option value="${g}"${g === m.gama ? ' selected' : ''}>${LABEL[g]}</option>`).join('')}</select> <button class="del" data-model="${m.id}" title="Quitar modelo">✕</button></span></li>`).join('')
     : '<li class="empty">No hay modelos todavía</li>';
 }
 
@@ -82,7 +106,7 @@ function shiftMonth(d) {
   const [y, m] = month.split('-').map(Number);
   const dt = new Date(y, m - 1 + d, 1);
   month = `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}`;
-  setDefaultDate(); render();
+  setDefaultDate(); render(); checkNewMonth();
 }
 function setDefaultDate() {
   const today = new Date(); const t = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
@@ -109,12 +133,38 @@ $('model-form').onsubmit = e => {
   state.models.push({ id: uid(), name, gama: $('model-gama').value });
   save(); $('model-name').value = ''; render();
 };
+function openGoals() {
+  const g = goalsFor(month);
+  $('goal-title').textContent = 'Objetivos de ' + monthName(month);
+  GAMAS.forEach(x => $('goal-' + x).value = hasGoals(month) ? g[x] : '');
+  $('goal-dialog').showModal();
+}
 $('goals-form').onsubmit = e => {
-  e.preventDefault();
+  if (e.submitter && e.submitter.value !== 'ok') return;
   state.goals[month] = Object.fromEntries(GAMAS.map(g => [g, Math.max(0, parseInt($('goal-' + g).value, 10) || 0)]));
   save(); render();
 };
+$('goal-cancel').onclick = () => $('goal-dialog').close();
+$('history').onclick = e => { const tr = e.target.closest('tr[data-month]'); if (tr) { month = tr.dataset.month; setDefaultDate(); render(); } };
+$('models').onchange = e => {
+  const id = e.target.dataset.gama; if (!id) return;
+  const m = state.models.find(x => x.id === id); m.gama = e.target.value;
+  state.sales.forEach(s => { if (s.modelId === id) s.gama = m.gama; });
+  save(); render();
+};
+// Al abrir (o al cambiar de mes con la página abierta) pide el objetivo del mes en curso si falta.
+let askedFor = '';
+function checkNewMonth() {
+  const cur = nowMonth();
+  if (cur !== askedFor && !hasGoals(cur)) {
+    askedFor = cur; month = cur; setDefaultDate(); render(); checkNewMonth();
+    if (!$('goal-dialog').open) openGoals();
+  }
+}
+document.addEventListener('visibilitychange', () => { if (!document.hidden) checkNewMonth(); });
+setInterval(checkNewMonth, 60000);
 document.addEventListener('click', e => {
+  if (e.target.matches('[data-open-goals]')) return openGoals();
   const sid = e.target.dataset && e.target.dataset.sale, mid = e.target.dataset && e.target.dataset.model;
   if (sid && confirm('¿Borrar esta venta?')) { state.sales = state.sales.filter(s => s.id !== sid); save(); render(); }
   if (mid) {
@@ -138,4 +188,4 @@ $('import').onchange = async e => {
   e.target.value = '';
 };
 
-setDefaultDate(); render();
+setDefaultDate(); render(); checkNewMonth();
