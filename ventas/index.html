@@ -5,6 +5,14 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Ventas del mes</title>
 <meta name="theme-color" content="#4070AB">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Ventas">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="description" content="Ventas, objetivos e incentivos del mes en un panel.">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700&display=swap">
 <link rel="stylesheet" href="tokens.css">
 <link rel="stylesheet" href="bundle.css">
@@ -91,11 +99,20 @@
     <ul id="models" class="models"></ul>
   </section>
 
+  <section class="card ag-card ag-grain" id="install-box" hidden>
+    <h2 class="title3">Instalar la app</h2>
+    <p class="hint footnote">Instálala en tu móvil u ordenador: se abre como una app, con su icono, y funciona aunque no haya cobertura.</p>
+    <button class="ag-btn ag-btn--primary body" id="install-btn" hidden>Instalar app</button>
+    <p class="hint footnote" id="install-ios" hidden><strong>iPhone / iPad:</strong> abre esta página en Safari, pulsa el botón <strong>Compartir</strong> (el cuadrado con la flecha) y elige <strong>“Añadir a pantalla de inicio”</strong>.</p>
+    <p class="hint footnote" id="install-other" hidden>En el menú del navegador (⋮) elige <strong>“Instalar app”</strong> o <strong>“Añadir a pantalla de inicio”</strong>.</p>
+  </section>
+
   <section class="card ag-card ag-grain">
     <h2 class="title3">Cuenta y copia de seguridad</h2>
     <p class="hint footnote">Estado: <strong id="sync">–</strong>. Tus datos se guardan en tu cuenta y los ves desde cualquier dispositivo.</p>
     <button class="ag-btn ag-btn--glass body" id="export">Descargar copia</button>
     <label class="file ag-btn ag-btn--glass body">Restaurar copia <input type="file" id="import" accept="application/json"></label>
+    <button class="ag-btn ag-btn--glass body" id="share">Compartir enlace</button>
     <button class="ag-btn ag-btn--glass body" id="logout">Cerrar sesión</button>
   </section>
 </main>
@@ -103,6 +120,7 @@
   <form method="dialog" id="goals-form">
     <h2 id="goal-title" class="title3">Objetivos</h2>
     <p class="hint footnote">Por gama: unidades objetivo, incentivo al 100% y tope de cumplimiento. Por debajo del 80% no se cobra; desde el 80% se cobra lineal (tu % × incentivo) hasta el tope.</p>
+    <p class="hint footnote" id="goal-prefill" hidden></p>
     <div class="gbox"><strong class="headline">Alta</strong><div class="grid3">
       <label>Unidades <input class="ag-input body" type="number" min="0" id="goal-alta" required></label>
       <label>Incentivo 100% (€) <input class="ag-input body" type="number" min="0" step="any" id="inc-alta"></label>

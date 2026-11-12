@@ -158,3 +158,7 @@ td small{color:var(--ink-secondary);font-size:11px}
   #sale-form .ag-btn{flex:1 1 100%}
   .stepper .ag-input{flex:1;width:auto}
 }
+
+#install-btn{margin-top:var(--space-2)}
+#share{margin-left:var(--space-2)}
+@media(max-width:480px){#share,#logout{margin-left:0;margin-top:var(--space-2)}}

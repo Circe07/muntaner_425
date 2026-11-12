@@ -20,6 +20,10 @@ const NOV = {
 };
 // Unidades por modelo del 1 al 10/11 (TPV Media Markt El Prat, marca Honor; las variantes del mismo modelo se suman)
 const NOV_SALES = [['PAD 4', 2], ['PAD 10', 13], ['PAD X8b', 1], ['H400 Smart', 14], ['H600', 1], ['H600 Lite', 5], ['H600 Smart', 2], ['M8 Lite', 2], ['X5c Plus', 8]];
+// Plantilla de la marca (campaña noviembre 2026): sirve para rellenar el primer mes de cada cuenta nueva.
+const BRAND_TEMPLATE = { inc: NOV.goals.inc, max: NOV.goals.max, unit: NOV.goals.unit };
+// Cuenta nueva: modelos de la marca, sin ventas ni objetivos (cada persona pone los suyos).
+const freshState = () => ({ models: SEED.map(([name, gama]) => ({ id: uid(), name, gama })), sales: [], goals: {}, seedVersion: 6 });
 const nowMonth = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`; };
 let state = load();
 let month = nowMonth();
@@ -30,7 +34,7 @@ function load() {
   return migrate(s);
 }
 function migrate(s) {
-  if (!s || !s.models) s = { models: [], sales: [], goals: {} };
+  if (!s || !s.models) return freshState();
   const v = s.seedVersion || 0;
   if (v < 2) {
     const used = new Set(s.sales.map(x => x.modelId));
@@ -60,7 +64,7 @@ function migrate(s) {
       });
     }
   }
-  s.seedVersion = 5;
+  s.seedVersion = 6;
   return s;
 }
 function persistLocal() { try { localStorage.setItem(KEY, JSON.stringify(state)); } catch (e) { alert('No se pudo guardar en el navegador.'); } }
@@ -186,75 +190,6 @@ function shiftMonth(d) {
   month = `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}`;
   setDefaultDate(); render();
 
-// ---------- Cuenta y sincronización (Supabase) ----------
-const CFG = window.SUPABASE_CONFIG;
-let sb = null, session = null, rev = 0, pushTimer = null, pushing = false, dirty = false;
-function setStatus(text, s = '') { $('sync').textContent = text; $('sync-dot').dataset.s = s; $('sync-dot').title = text; }
-const traducir = m => /invalid login/i.test(m) ? 'Correo o contraseña incorrectos.'
-  : /not confirmed/i.test(m) ? 'Falta confirmar el correo: abre el enlace que te hemos enviado.'
-  : /already registered|registro cerrado|database error/i.test(m) ? 'Esta app ya tiene su cuenta: usa “Entrar”.'
-  : /password/i.test(m) ? 'La contraseña debe tener al menos 8 caracteres.'
-  : /rate limit|too many/i.test(m) ? 'Demasiados intentos: espera unos minutos y prueba otra vez.'
-  : 'No se pudo completar. Comprueba la conexión y vuelve a intentarlo.';
-
-function askLogin() {
-  return new Promise(resolve => {
-    const dlg = $('auth-dialog'), msg = $('auth-msg');
-    dlg.addEventListener('cancel', e => e.preventDefault());
-    $('auth-form').onsubmit = async e => {
-      e.preventDefault();
-      const kind = e.submitter && e.submitter.value, email = $('auth-email').value.trim(), password = $('auth-pass').value;
-      msg.hidden = true; $('auth-form').querySelectorAll('button').forEach(b => b.disabled = true);
-      const { data, error } = kind === 'signup' ? await sb.auth.signUp({ email, password }) : await sb.auth.signInWithPassword({ email, password });
-      $('auth-form').querySelectorAll('button').forEach(b => b.disabled = false);
-      if (error) { msg.textContent = traducir(error.message); msg.hidden = false; return; }
-      if (!data.session) { msg.textContent = 'Te hemos enviado un correo: confirma y vuelve a pulsar “Entrar”.'; msg.hidden = false; return; }
-      session = data.session; dlg.close(); resolve();
-    };
-    dlg.showModal();
-  });
-}
-async function pull() {
-  setStatus('Sincronizando…');
-  const { data, error } = await sb.from('app_state').select('data,rev').maybeSingle();
-  if (error) { setStatus('Sin conexión: los cambios se guardan en este dispositivo', 'off'); return false; }
-  if (data) { state = migrate(data.data); rev = data.rev; persistLocal(); setStatus('Sincronizado', 'ok'); render(); return true; }
-  rev = 0; await push(); return true;   // primera vez: sube lo que hay en este dispositivo
-}
-function schedulePush() { if (!sb || !session) return; dirty = true; setStatus('Guardando…', 'busy'); clearTimeout(pushTimer); pushTimer = setTimeout(push, 700); }
-async function push() {
-  if (!sb || !session || pushing) return;
-  clearTimeout(pushTimer); pushing = true; dirty = false;
-  const row = { user_id: session.user.id, data: state, rev: rev + 1, updated_at: new Date().toISOString() };
-  const r = rev === 0 ? await sb.from('app_state').insert(row).select('rev')
-    : await sb.from('app_state').update(row).eq('user_id', session.user.id).eq('rev', rev).select('rev');
-  pushing = false;
-  if (r.error || !r.data || !r.data.length) {   // conflicto (otro dispositivo guardó antes) o sin conexión
-    if (r.error && !/duplicate|conflict/i.test(r.error.message)) { setStatus('Sin conexión: los cambios se guardan en este dispositivo', 'off'); return; }
-    await pull(); setStatus('Se actualizó desde otro dispositivo: repite el último cambio si no aparece', 'off'); return;
-  }
-  rev = r.data[0].rev; setStatus('Sincronizado', 'ok');
-  if (dirty) schedulePush();
-}
-async function initCloud() {
-  if (!CFG || !window.supabase) { ready = true; checkNewMonth(); return; }
-  sb = window.supabase.createClient(CFG.url, CFG.key, { auth: { persistSession: true, autoRefreshToken: true } });
-  session = (await sb.auth.getSession()).data.session;
-  sb.auth.onAuthStateChange((_e, s) => { session = s; });
-  if (!session) await askLogin();
-  await pull();
-  ready = true; render(); checkNewMonth();
-}
-document.addEventListener('visibilitychange', () => {
-  if (!sb || !session) return;
-  if (document.hidden) { if (dirty) push(); }
-  else if (!dirty && !pushing && !document.querySelector('dialog[open]')) pull();
-});
-$('logout').onclick = async () => {
-  if (!sb || !confirm('¿Cerrar sesión en este dispositivo?')) return;
-  await sb.auth.signOut(); try { localStorage.removeItem(KEY); } catch (e) {} location.reload();
-};
-initCloud();
 }
 function setDefaultDate() {
   const today = new Date(); const t = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
@@ -276,8 +211,8 @@ function updateSaleForm() {
   $('qty-minus').disabled = getQty() <= 0;
 }
 function showToast(msg, undo) {
-  $('toast-msg').textContent = msg; $('toast').hidden = false;
-  $('toast-undo').onclick = () => { undo(); $('toast').hidden = true; clearTimeout(toastTimer); };
+  $('toast-msg').textContent = msg; $('toast').hidden = false; $('toast-undo').hidden = !undo;
+  $('toast-undo').onclick = () => { if (undo) undo(); $('toast').hidden = true; clearTimeout(toastTimer); };
   clearTimeout(toastTimer); toastTimer = setTimeout(() => { $('toast').hidden = true; }, 8000);
 }
 document.querySelectorAll('.seg-btn').forEach(b => b.onclick = () => {
@@ -318,12 +253,19 @@ function ruleRow(model = '', amounts = '') {
     <button type="button" class="del" aria-label="Quitar" data-rule-del>✕</button>`;
   $('unit-rules').appendChild(d);
 }
+function lastConfig(m) {
+  const prev = Object.keys(state.goals).filter(k => k < m && state.goals[k].inc).sort().pop();
+  return prev ? { ...state.goals[prev], from: prev } : { ...BRAND_TEMPLATE, from: null };
+}
 function openGoals() {
   const g = goalsFor(month), has = hasGoals(month);
   $('goal-title').textContent = 'Objetivos de ' + monthName(month);
-  GAMAS.forEach(x => { $('goal-' + x).value = has ? g[x] : ''; $('inc-' + x).value = has ? incOf(g, x) : ''; $('max-' + x).value = has ? maxOf(g, x) : ''; });
+  const cfg = has ? g : lastConfig(month);   // mes nuevo: precarga incentivos, topes y unitarios del anterior (las unidades las pones tú)
+  GAMAS.forEach(x => { $('goal-' + x).value = has ? g[x] : ''; $('inc-' + x).value = incOf(cfg, x) || ''; $('max-' + x).value = (cfg.max && cfg.max[x]) || ''; });
   $('unit-rules').innerHTML = '';
-  (g.unit || []).forEach(r => ruleRow(r.model, r.amounts.join(', ')));
+  (cfg.unit || []).forEach(r => ruleRow(r.model, r.amounts.join(', ')));
+  $('goal-prefill').hidden = has;
+  if (!has) $('goal-prefill').textContent = cfg.from ? `Precargado con la configuración de ${monthName(cfg.from)}: ajusta lo que cambie y pon tus unidades.` : 'Precargado con la campaña de la marca (noviembre 2026): ajusta lo que cambie y pon tus unidades.';
   $('goal-dialog').showModal();
 }
 $('goals-form').onsubmit = e => {
@@ -356,75 +298,6 @@ function checkNewMonth() {
   if (cur !== askedFor && !hasGoals(cur)) {
     askedFor = cur; month = cur; setDefaultDate(); render();
 
-// ---------- Cuenta y sincronización (Supabase) ----------
-const CFG = window.SUPABASE_CONFIG;
-let sb = null, session = null, rev = 0, pushTimer = null, pushing = false, dirty = false;
-function setStatus(text, s = '') { $('sync').textContent = text; $('sync-dot').dataset.s = s; $('sync-dot').title = text; }
-const traducir = m => /invalid login/i.test(m) ? 'Correo o contraseña incorrectos.'
-  : /not confirmed/i.test(m) ? 'Falta confirmar el correo: abre el enlace que te hemos enviado.'
-  : /already registered|registro cerrado|database error/i.test(m) ? 'Esta app ya tiene su cuenta: usa “Entrar”.'
-  : /password/i.test(m) ? 'La contraseña debe tener al menos 8 caracteres.'
-  : /rate limit|too many/i.test(m) ? 'Demasiados intentos: espera unos minutos y prueba otra vez.'
-  : 'No se pudo completar. Comprueba la conexión y vuelve a intentarlo.';
-
-function askLogin() {
-  return new Promise(resolve => {
-    const dlg = $('auth-dialog'), msg = $('auth-msg');
-    dlg.addEventListener('cancel', e => e.preventDefault());
-    $('auth-form').onsubmit = async e => {
-      e.preventDefault();
-      const kind = e.submitter && e.submitter.value, email = $('auth-email').value.trim(), password = $('auth-pass').value;
-      msg.hidden = true; $('auth-form').querySelectorAll('button').forEach(b => b.disabled = true);
-      const { data, error } = kind === 'signup' ? await sb.auth.signUp({ email, password }) : await sb.auth.signInWithPassword({ email, password });
-      $('auth-form').querySelectorAll('button').forEach(b => b.disabled = false);
-      if (error) { msg.textContent = traducir(error.message); msg.hidden = false; return; }
-      if (!data.session) { msg.textContent = 'Te hemos enviado un correo: confirma y vuelve a pulsar “Entrar”.'; msg.hidden = false; return; }
-      session = data.session; dlg.close(); resolve();
-    };
-    dlg.showModal();
-  });
-}
-async function pull() {
-  setStatus('Sincronizando…');
-  const { data, error } = await sb.from('app_state').select('data,rev').maybeSingle();
-  if (error) { setStatus('Sin conexión: los cambios se guardan en este dispositivo', 'off'); return false; }
-  if (data) { state = migrate(data.data); rev = data.rev; persistLocal(); setStatus('Sincronizado', 'ok'); render(); return true; }
-  rev = 0; await push(); return true;   // primera vez: sube lo que hay en este dispositivo
-}
-function schedulePush() { if (!sb || !session) return; dirty = true; setStatus('Guardando…', 'busy'); clearTimeout(pushTimer); pushTimer = setTimeout(push, 700); }
-async function push() {
-  if (!sb || !session || pushing) return;
-  clearTimeout(pushTimer); pushing = true; dirty = false;
-  const row = { user_id: session.user.id, data: state, rev: rev + 1, updated_at: new Date().toISOString() };
-  const r = rev === 0 ? await sb.from('app_state').insert(row).select('rev')
-    : await sb.from('app_state').update(row).eq('user_id', session.user.id).eq('rev', rev).select('rev');
-  pushing = false;
-  if (r.error || !r.data || !r.data.length) {   // conflicto (otro dispositivo guardó antes) o sin conexión
-    if (r.error && !/duplicate|conflict/i.test(r.error.message)) { setStatus('Sin conexión: los cambios se guardan en este dispositivo', 'off'); return; }
-    await pull(); setStatus('Se actualizó desde otro dispositivo: repite el último cambio si no aparece', 'off'); return;
-  }
-  rev = r.data[0].rev; setStatus('Sincronizado', 'ok');
-  if (dirty) schedulePush();
-}
-async function initCloud() {
-  if (!CFG || !window.supabase) { ready = true; checkNewMonth(); return; }
-  sb = window.supabase.createClient(CFG.url, CFG.key, { auth: { persistSession: true, autoRefreshToken: true } });
-  session = (await sb.auth.getSession()).data.session;
-  sb.auth.onAuthStateChange((_e, s) => { session = s; });
-  if (!session) await askLogin();
-  await pull();
-  ready = true; render(); checkNewMonth();
-}
-document.addEventListener('visibilitychange', () => {
-  if (!sb || !session) return;
-  if (document.hidden) { if (dirty) push(); }
-  else if (!dirty && !pushing && !document.querySelector('dialog[open]')) pull();
-});
-$('logout').onclick = async () => {
-  if (!sb || !confirm('¿Cerrar sesión en este dispositivo?')) return;
-  await sb.auth.signOut(); try { localStorage.removeItem(KEY); } catch (e) {} location.reload();
-};
-initCloud();
     if (!$('goal-dialog').open) openGoals();
   }
 }
@@ -530,3 +403,24 @@ $('logout').onclick = async () => {
   await sb.auth.signOut(); try { localStorage.removeItem(KEY); } catch (e) {} location.reload();
 };
 initCloud();
+
+// ---------- App instalable (PWA) ----------
+let deferredInstall = null;
+const standalone = () => matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
+const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+function updateInstallUI() {
+  $('install-box').hidden = standalone();
+  $('install-btn').hidden = !deferredInstall;
+  $('install-ios').hidden = !(isIOS && !deferredInstall);
+  $('install-other').hidden = !!deferredInstall || isIOS;
+}
+window.addEventListener('beforeinstallprompt', e => { e.preventDefault(); deferredInstall = e; updateInstallUI(); });
+window.addEventListener('appinstalled', () => { deferredInstall = null; updateInstallUI(); });
+$('install-btn').onclick = async () => { if (!deferredInstall) return; deferredInstall.prompt(); await deferredInstall.userChoice; deferredInstall = null; updateInstallUI(); };
+$('share').onclick = async () => {
+  const url = location.origin + '/';
+  try { if (navigator.share) { await navigator.share({ title: 'Ventas del mes', text: 'Panel de ventas, objetivos e incentivos del mes', url }); return; } } catch (e) { if (e.name === 'AbortError') return; }
+  try { await navigator.clipboard.writeText(url); showToast('Enlace copiado', null); } catch (e) { prompt('Copia este enlace:', url); }
+};
+updateInstallUI();
+if ('serviceWorker' in navigator && /^https?:$/.test(location.protocol)) window.addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));
