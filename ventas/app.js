@@ -27,7 +27,7 @@ const NOV_SALES = [['PAD 4', 2], ['PAD 10', 13], ['PAD X8b', 1], ['H400 Smart', 
 // Plantilla de la marca (campaña noviembre 2026): sirve para rellenar el primer mes de cada cuenta nueva.
 const BRAND_TEMPLATE = { inc: NOV.goals.inc, max: NOV.goals.max, unit: NOV.goals.unit };
 // Cuenta nueva: modelos de la marca, sin ventas ni objetivos (cada persona pone los suyos).
-const freshState = () => ({ models: [], sales: [], goals: {}, plans: {}, seedVersion: 8 });
+const freshState = () => ({ models: [], sales: [], goals: {}, plans: {}, settings: {}, seedVersion: 8 });
 const seedNames = new Set(SEED.map(([n]) => n.trim().toLowerCase()));
 const isSeedName = n => seedNames.has(String(n).trim().toLowerCase());
 const nowMonth = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`; };
@@ -44,6 +44,7 @@ function migrate(s) {
   const v = s.seedVersion || 0;
   if (!s.goals) s.goals = {};
   if (!s.plans) s.plans = {};
+  if (!s.settings) s.settings = {};
   if (v < 2) {
     const used = new Set(s.sales.map(x => x.modelId));
     s.models = s.models.filter(m => !(OLD_SEED.includes(m.name) && !used.has(m.id)));
@@ -238,7 +239,9 @@ function render() {
   $('models').innerHTML = state.models.length
     ? state.models.map(m => {
         const extra = (!m.gama || gs.some(g => g.id === m.gama)) ? '' : `<option value="${esc(m.gama)}" selected>${esc(LABEL[m.gama] || m.gama)}</option>`;
-        return `<li><span>${esc(m.name)}</span><span><select class="ag-input footnote" data-gama="${m.id}">${extra}${gOpts(m.gama)}</select> <button class="del" aria-label="Quitar modelo" data-model="${m.id}" title="Quitar modelo">✕</button></span></li>`;
+        const guess = Report.typeOf(Report.deviceType(m.name, groupOfName(m.name, m.gama).name)).label;
+        const tipoSel = `<select class="ag-input footnote" data-tipo="${m.id}" aria-label="Tipo de producto"><option value="">Tipo: ${esc(guess)}</option>${Report.TYPES.map(t => `<option value="${t.key}"${m.tipo === t.key ? ' selected' : ''}>${t.label}</option>`).join('')}</select>`;
+        return `<li><span>${esc(m.name)}</span><span><select class="ag-input footnote" data-gama="${m.id}" aria-label="Grupo">${extra}${gOpts(m.gama)}</select>${tipoSel}<button class="del" aria-label="Quitar modelo" data-model="${m.id}" title="Quitar modelo">✕</button></span></li>`;
       }).join('')
     : '<li class="empty">No hay modelos todavía</li>';
   $('models-clear').hidden = !state.models.length;
@@ -504,6 +507,8 @@ function assignModelGroup(m, groupId) {
   state.sales.forEach(s => { if (s.modelId === m.id) s.gama = groupId; });
 }
 $('models').onchange = e => {
+  const tid = e.target.dataset.tipo;
+  if (tid) { const m = state.models.find(x => x.id === tid); if (e.target.value) m.tipo = e.target.value; else delete m.tipo; save(); render(); return; }
   const id = e.target.dataset.gama; if (!id) return;
   assignModelGroup(state.models.find(x => x.id === id), e.target.value);
   save(); render();
@@ -562,6 +567,55 @@ $('import').onchange = async e => {
 };
 
 setDefaultDate(); render();
+
+// ---------- reporte del día (para pegar en WhatsApp) ----------
+function typeOfSale(s, ym) {
+  const model = state.models.find(m => norm(m.name) === norm(s.name));
+  let gname = '';
+  for (const p of plansOf(ym)) { const id = Plan.groupIdsOf(p, s)[0]; const g = id && p.groups.find(x => x.id === id); if (g) { gname = g.name; break; } }
+  return Report.deviceType(s.name, gname, model && model.tipo);
+}
+function buildDayReport() {
+  const date = $('rp-date').value || todayStr();
+  return Report.build({ date, sales: state.sales, typeOf: s => typeOfSale(s, date.slice(0, 7)), title: $('rp-title').value.trim(), emoji: $('rp-emoji').checked, withMonth: $('rp-month').checked });
+}
+function paintReport() {
+  const r = buildDayReport();
+  $('rp-text').value = r.empty ? '' : r.text;
+  $('rp-text').rows = r.empty ? 3 : Math.min(18, r.text.split('\n').length + 1);
+  $('rp-empty').hidden = !r.empty;
+  $('rp-copy').disabled = r.empty; $('rp-copy').textContent = 'Copiar reporte';
+  $('rp-wa').href = r.empty ? '#' : 'https://wa.me/?text=' + encodeURIComponent(r.text);
+  $('rp-wa').setAttribute('aria-disabled', String(r.empty));
+}
+function openReport() {
+  const st = state.settings || (state.settings = {});
+  $('rp-date').value = todayStr();
+  $('rp-title').value = st.reportTitle || '';
+  $('rp-emoji').checked = st.reportEmoji !== false;
+  $('rp-month').checked = !!st.reportMonth;
+  paintReport();
+  const dlg = $('report-dialog'); if (!dlg.open) dlg.showModal();
+  $('rp-head').focus();
+}
+['rp-date', 'rp-title', 'rp-emoji', 'rp-month'].forEach(id => $(id).addEventListener('input', () => {
+  paintReport();
+  if (id === 'rp-date') return;
+  state.settings = state.settings || {};
+  state.settings.reportTitle = $('rp-title').value.trim(); state.settings.reportEmoji = $('rp-emoji').checked; state.settings.reportMonth = $('rp-month').checked;
+  save();
+}));
+$('rp-fab').onclick = openReport;
+$('rp-x').onclick = () => $('report-dialog').close();
+$('rp-copy').onclick = async () => {
+  const text = $('rp-text').value; if (!text) return;
+  try { await navigator.clipboard.writeText(text); }
+  catch (e) { $('rp-text').focus(); $('rp-text').select(); try { document.execCommand('copy'); } catch (_) {} }
+  $('rp-copy').textContent = '✓ Copiado: pégalo en WhatsApp';
+  setTimeout(() => { $('rp-copy').textContent = 'Copiar reporte'; }, 3500);
+};
+if (inApp) $('rp-wa').removeAttribute('target');
+$('rp-wa').addEventListener('click', e => { if ($('rp-wa').getAttribute('aria-disabled') === 'true') e.preventDefault(); });
 
 // ---------- Cuenta y sincronización (Supabase) ----------
 const CFG = window.SUPABASE_CONFIG;

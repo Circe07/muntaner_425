@@ -211,10 +211,28 @@
     <div class="row authrow"><button class="ag-btn ag-btn--primary body" value="login">Entrar</button><button class="ag-btn ag-btn--glass body" value="signup" formnovalidate>Crear cuenta</button></div>
   </form>
 </dialog>
+<button type="button" class="fab" id="rp-fab" aria-label="Reporte del día">
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="4" width="14" height="17" rx="3"/><path d="M9 4.5h6M9 10h6M9 14h6M9 18h3"/></svg>
+  <span>Reporte</span>
+</button>
+<dialog id="report-dialog" class="ag-grain">
+  <div class="pd-head"><h2 class="title3" id="rp-head" tabindex="-1">Reporte del día</h2><button type="button" class="del" id="rp-x" aria-label="Cerrar">✕</button></div>
+  <div class="rp-controls">
+    <label>Día <input class="ag-input body" type="date" id="rp-date"></label>
+    <label>Nombre en el reporte (opcional) <input class="ag-input body" id="rp-title" maxlength="60" placeholder="Ej. Honor · Media Markt El Prat" autocomplete="off"></label>
+    <label class="check"><input type="checkbox" id="rp-month"> <span>Incluir el acumulado del mes</span></label>
+    <label class="check"><input type="checkbox" id="rp-emoji" checked> <span>Con emojis</span></label>
+  </div>
+  <p class="hint footnote" id="rp-empty" hidden>Ese día no hay ventas registradas.</p>
+  <textarea class="ag-input rp-text" id="rp-text" readonly rows="10" aria-label="Reporte listo para copiar" spellcheck="false"></textarea>
+  <div class="row"><a class="ag-btn ag-btn--glass body" id="rp-wa" href="#" target="_blank" rel="noopener">Abrir WhatsApp</a><button type="button" class="ag-btn ag-btn--primary body" id="rp-copy">Copiar reporte</button></div>
+  <p class="hint footnote">Los modelos se agrupan por tipo de producto (móviles, tablets, relojes…). Si alguno sale en el sitio equivocado, cámbialo en «Modelos» → «Tipo».</p>
+</dialog>
 <div id="toast" class="ag-toast toast" role="status" aria-live="polite" hidden><p class="ag-toast__message body" id="toast-msg"></p><button type="button" class="ag-toast__action" id="toast-undo">Deshacer</button></div>
 <script src="config.js"></script>
 <script src="vendor/supabase.js"></script>
 <script src="plan.js"></script>
+<script src="report.js"></script>
 <script src="app.js"></script>
 </body>
 </html>
