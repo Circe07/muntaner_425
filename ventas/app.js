@@ -89,11 +89,14 @@ function incentives(m) {
   return { gamas, gamasMax, units, total: gamas + units };
 }
 const MESES = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
+const MES3 = ['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
+const monthShort = m => { const [y, n] = m.split('-'); return `${MES3[+n - 1]} ${y}`; };
 const monthName = m => { const [y, n] = m.split('-'); return `${MESES[+n - 1]} ${y}`; };
 const monthSales = () => state.sales.filter(s => s.date.startsWith(month)).sort((a, b) => b.date.localeCompare(a.date));
 
 function render() {
   $('month').value = month;
+  $('month-label').textContent = monthName(month);
   const sales = monthSales();
 
   // selector de modelos
@@ -125,7 +128,7 @@ function render() {
   // incentivos por unidad
   const rows = unitRows(goals, sales), inc = incentives(month);
   $('unit-card').hidden = !rows.length;
-  $('unit-table').tBodies[0].innerHTML = rows.map(r => `<tr><td>${esc(r.model)}</td><td class="n">${r.n}</td><td class="n">${r.amounts.map(eur).join(' / ')}</td><td class="n">${eur(r.next)}</td><td class="n"><strong>${eur(r.pay)}</strong></td></tr>`).join('');
+  $('unit-table').tBodies[0].innerHTML = rows.map(r => `<tr><td>${esc(r.model)}</td><td class="n">${r.n}</td><td class="n c-imp">${r.amounts.map(eur).join(' / ')}</td><td class="n">${eur(r.next)}</td><td class="n"><strong>${eur(r.pay)}</strong></td></tr>`).join('');
   $('unit-total').textContent = eur(inc.units);
   const lump = sales.filter(s => !s.modelId).reduce((a, s) => a + s.qty, 0);
   $('unit-warn').hidden = !(rows.length && lump);
@@ -141,10 +144,10 @@ function render() {
     const g = goalsFor(m), ss = state.sales.filter(s => s.date.startsWith(m));
     const cells = GAMAS.map(x => {
       const sold = soldIn(ss, x), goal = +g[x] || 0;
-      return `<td>${sold} / ${goal || '–'}${goal ? ` (${Math.round(sold / goal * 100)}%)` : ''}</td>`;
+      return `<td class="nw">${sold}/${goal || '–'}${goal ? `<br><small>${Math.round(sold / goal * 100)}%</small>` : ''}</td>`;
     }).join('');
     const t = incentives(m);
-    return `<tr data-month="${m}" class="${m === month ? 'cur' : ''}"><td>${monthName(m)}</td>${cells}<td>${hasGoals(m) ? eur(t.total) : '–'}</td></tr>`;
+    return `<tr data-month="${m}" class="${m === month ? 'cur' : ''}"><td class="nw">${monthShort(m)}</td>${cells}<td class="nw">${hasGoals(m) ? eur(t.total) : '–'}</td></tr>`;
   }).join('');
 
   // por modelo (ventas del mes agrupadas por nombre; incluye modelos activos sin ventas)
@@ -165,7 +168,7 @@ function render() {
   // listado de ventas
   $('total').textContent = sales.reduce((a, s) => a + s.qty, 0) + ' uds.';
   $('sales').tBodies[0].innerHTML = sales.length
-    ? sales.map(s => `<tr><td>${s.date.split('-').reverse().join('/')}</td><td>${esc(s.name)}</td><td><span class="tag ${s.gama}">${LABEL[s.gama]}</span></td><td class="n">${s.qty}</td><td class="n"><button class="del" aria-label="Borrar venta" data-sale="${s.id}" title="Borrar">✕</button></td></tr>`).join('')
+    ? sales.map(s => `<tr><td class="nw">${s.date.slice(8)}/${s.date.slice(5, 7)}</td><td>${esc(s.name)}</td><td><span class="tag ${s.gama}">${LABEL[s.gama]}</span></td><td class="n">${s.qty}</td><td class="n"><button class="del" aria-label="Borrar venta" data-sale="${s.id}" title="Borrar">✕</button></td></tr>`).join('')
     : '<tr><td colspan="5" class="empty">Sin ventas este mes</td></tr>';
 
   // gestión de modelos

@@ -15,7 +15,7 @@
   <h1 class="headline">Ventas del mes</h1><span id="sync-dot" class="sync-dot" role="status" aria-label="Estado de sincronización"></span>
   <div class="month">
     <button class="ag-navbar__action" id="prev" aria-label="Mes anterior">‹</button>
-    <input class="ag-input body" type="month" id="month">
+    <label class="monthpick"><span id="month-label" class="monthlabel" aria-hidden="true"></span><input class="ag-input body" type="month" id="month" aria-label="Mes"></label>
     <button class="ag-navbar__action" id="next" aria-label="Mes siguiente">›</button>
   </div>
 </header>
@@ -42,7 +42,7 @@
 
   <section class="card ag-card ag-grain" id="unit-card" hidden>
     <h2 class="title3">Incentivos por unidad <span class="badge" id="unit-total"></span></h2>
-    <table id="unit-table"><thead><tr><th>Modelo</th><th class="n">Uds.</th><th class="n">Importes (1ª / 2ª / …)</th><th class="n">Próxima</th><th class="n">Cobras</th></tr></thead><tbody></tbody></table>
+    <table id="unit-table"><thead><tr><th>Modelo</th><th class="n">Uds.</th><th class="n c-imp">Importes (1ª / 2ª / …)</th><th class="n">Sig.</th><th class="n">Cobras</th></tr></thead><tbody></tbody></table>
     <p class="hint footnote banner-text" id="unit-warn" hidden></p>
   </section>
 
