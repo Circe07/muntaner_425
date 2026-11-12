@@ -95,3 +95,8 @@ dialog{max-width:560px;max-height:92vh;overflow:auto}
 @media(max-width:480px){.rule{grid-template-columns:1fr auto}.rule select{grid-column:1/-1}}
 #unit-warn{color:var(--warning);font-weight:600}
 #unit-table{display:block;overflow-x:auto}
+
+.sync-dot{width:8px;height:8px;border-radius:50%;background:var(--ink-tertiary);flex:none;margin-right:auto}
+.sync-dot[data-s=ok]{background:var(--success)}.sync-dot[data-s=busy]{background:var(--accent)}.sync-dot[data-s=off]{background:var(--danger)}
+#auth-dialog{max-width:380px}#auth-dialog .ag-hint[hidden]{display:none}
+#logout{margin-left:var(--space-2)}

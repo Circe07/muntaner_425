@@ -18,6 +18,8 @@ const NOV = {
     unit: [{ model: 'Magic V6', amounts: [50, 70, 100] }, { model: 'M8 Pro', amounts: [20] }, { model: 'H600', amounts: [10] }, { model: 'H600 Lite', amounts: [5] }] },
   sold: { alta: 3, media: 19, baja: 19 }
 };
+// Unidades por modelo del 1 al 10/11 (TPV Media Markt El Prat, marca Honor; las variantes del mismo modelo se suman)
+const NOV_SALES = [['PAD 4', 2], ['PAD 10', 13], ['PAD X8b', 1], ['H400 Smart', 14], ['H600', 1], ['H600 Lite', 5], ['H600 Smart', 2], ['M8 Lite', 2], ['X5c Plus', 8]];
 const nowMonth = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`; };
 let state = load();
 let month = nowMonth();
@@ -25,6 +27,9 @@ let month = nowMonth();
 function load() {
   let s = null;
   try { s = JSON.parse(localStorage.getItem(KEY)); } catch (e) {}
+  return migrate(s);
+}
+function migrate(s) {
   if (!s || !s.models) s = { models: [], sales: [], goals: {} };
   const v = s.seedVersion || 0;
   if (v < 2) {
@@ -45,10 +50,21 @@ function load() {
     const g = s.goals['2026-11'];
     if (g && g.alta === 30 && g.media === 85 && g.baja === 100) { g.inc = g.inc || NOV.goals.inc; g.max = g.max || NOV.goals.max; g.unit = g.unit || structuredClone(NOV.goals.unit); }
   }
-  s.seedVersion = 4;
+  if (v < 5) { // acumulado hasta el 10/11: sustituye los totales por gama por las unidades de cada modelo (foto del TPV)
+    const lump = s.sales.filter(x => !x.modelId && x.name.startsWith('Acumulado hasta 10/11'));
+    if (lump.length) {
+      s.sales = s.sales.filter(x => !lump.includes(x));
+      NOV_SALES.forEach(([name, qty]) => {
+        const m = s.models.find(k => k.name === name); if (!m) return;
+        s.sales.push({ id: uid(), date: '2026-11-10', modelId: m.id, name: m.name, gama: m.gama, qty });
+      });
+    }
+  }
+  s.seedVersion = 5;
   return s;
 }
-function save() { try { localStorage.setItem(KEY, JSON.stringify(state)); } catch (e) { alert('No se pudo guardar en el navegador.'); } }
+function persistLocal() { try { localStorage.setItem(KEY, JSON.stringify(state)); } catch (e) { alert('No se pudo guardar en el navegador.'); } }
+function save() { persistLocal(); schedulePush(); }
 
 // Objetivo de cada mes: se configura a mano, no se hereda del mes anterior.
 const hasGoals = m => !!state.goals[m];
@@ -162,7 +178,77 @@ function shiftMonth(d) {
   const [y, m] = month.split('-').map(Number);
   const dt = new Date(y, m - 1 + d, 1);
   month = `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}`;
-  setDefaultDate(); render(); checkNewMonth();
+  setDefaultDate(); render();
+
+// ---------- Cuenta y sincronización (Supabase) ----------
+const CFG = window.SUPABASE_CONFIG;
+let sb = null, session = null, rev = 0, pushTimer = null, pushing = false, dirty = false;
+function setStatus(text, s = '') { $('sync').textContent = text; $('sync-dot').dataset.s = s; $('sync-dot').title = text; }
+const traducir = m => /invalid login/i.test(m) ? 'Correo o contraseña incorrectos.'
+  : /not confirmed/i.test(m) ? 'Falta confirmar el correo: abre el enlace que te hemos enviado.'
+  : /already registered|registro cerrado/i.test(m) ? 'Esta app ya tiene su cuenta: usa “Entrar”.'
+  : /password/i.test(m) ? 'La contraseña debe tener al menos 8 caracteres.'
+  : /rate limit|too many/i.test(m) ? 'Demasiados intentos: espera unos minutos y prueba otra vez.'
+  : 'No se pudo completar. Comprueba la conexión y vuelve a intentarlo.';
+
+function askLogin() {
+  return new Promise(resolve => {
+    const dlg = $('auth-dialog'), msg = $('auth-msg');
+    dlg.addEventListener('cancel', e => e.preventDefault());
+    $('auth-form').onsubmit = async e => {
+      e.preventDefault();
+      const kind = e.submitter && e.submitter.value, email = $('auth-email').value.trim(), password = $('auth-pass').value;
+      msg.hidden = true; $('auth-form').querySelectorAll('button').forEach(b => b.disabled = true);
+      const { data, error } = kind === 'signup' ? await sb.auth.signUp({ email, password }) : await sb.auth.signInWithPassword({ email, password });
+      $('auth-form').querySelectorAll('button').forEach(b => b.disabled = false);
+      if (error) { msg.textContent = traducir(error.message); msg.hidden = false; return; }
+      if (!data.session) { msg.textContent = 'Te hemos enviado un correo: confirma y vuelve a pulsar “Entrar”.'; msg.hidden = false; return; }
+      session = data.session; dlg.close(); resolve();
+    };
+    dlg.showModal();
+  });
+}
+async function pull() {
+  setStatus('Sincronizando…');
+  const { data, error } = await sb.from('app_state').select('data,rev').maybeSingle();
+  if (error) { setStatus('Sin conexión: los cambios se guardan en este dispositivo', 'off'); return false; }
+  if (data) { state = migrate(data.data); rev = data.rev; persistLocal(); setStatus('Sincronizado', 'ok'); render(); return true; }
+  rev = 0; await push(); return true;   // primera vez: sube lo que hay en este dispositivo
+}
+function schedulePush() { if (!sb || !session) return; dirty = true; setStatus('Guardando…', 'busy'); clearTimeout(pushTimer); pushTimer = setTimeout(push, 700); }
+async function push() {
+  if (!sb || !session || pushing) return;
+  clearTimeout(pushTimer); pushing = true; dirty = false;
+  const row = { user_id: session.user.id, data: state, rev: rev + 1, updated_at: new Date().toISOString() };
+  const r = rev === 0 ? await sb.from('app_state').insert(row).select('rev')
+    : await sb.from('app_state').update(row).eq('user_id', session.user.id).eq('rev', rev).select('rev');
+  pushing = false;
+  if (r.error || !r.data || !r.data.length) {   // conflicto (otro dispositivo guardó antes) o sin conexión
+    if (r.error && !/duplicate|conflict/i.test(r.error.message)) { setStatus('Sin conexión: los cambios se guardan en este dispositivo', 'off'); return; }
+    await pull(); setStatus('Se actualizó desde otro dispositivo: repite el último cambio si no aparece', 'off'); return;
+  }
+  rev = r.data[0].rev; setStatus('Sincronizado', 'ok');
+  if (dirty) schedulePush();
+}
+async function initCloud() {
+  if (!CFG || !window.supabase) { ready = true; checkNewMonth(); return; }
+  sb = window.supabase.createClient(CFG.url, CFG.key, { auth: { persistSession: true, autoRefreshToken: true } });
+  session = (await sb.auth.getSession()).data.session;
+  sb.auth.onAuthStateChange((_e, s) => { session = s; });
+  if (!session) await askLogin();
+  await pull();
+  ready = true; render(); checkNewMonth();
+}
+document.addEventListener('visibilitychange', () => {
+  if (!sb || !session) return;
+  if (document.hidden) { if (dirty) push(); }
+  else if (!dirty && !pushing && !document.querySelector('dialog[open]')) pull();
+});
+$('logout').onclick = async () => {
+  if (!sb || !confirm('¿Cerrar sesión en este dispositivo?')) return;
+  await sb.auth.signOut(); try { localStorage.removeItem(KEY); } catch (e) {} location.reload();
+};
+initCloud();
 }
 function setDefaultDate() {
   const today = new Date(); const t = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
@@ -228,11 +314,82 @@ $('models').onchange = e => {
   save(); render();
 };
 // Al abrir (o al cambiar de mes con la página abierta) pide el objetivo del mes en curso si falta.
-let askedFor = '';
+let askedFor = '', ready = false;
 function checkNewMonth() {
+  if (!ready) return;
   const cur = nowMonth();
   if (cur !== askedFor && !hasGoals(cur)) {
-    askedFor = cur; month = cur; setDefaultDate(); render(); checkNewMonth();
+    askedFor = cur; month = cur; setDefaultDate(); render();
+
+// ---------- Cuenta y sincronización (Supabase) ----------
+const CFG = window.SUPABASE_CONFIG;
+let sb = null, session = null, rev = 0, pushTimer = null, pushing = false, dirty = false;
+function setStatus(text, s = '') { $('sync').textContent = text; $('sync-dot').dataset.s = s; $('sync-dot').title = text; }
+const traducir = m => /invalid login/i.test(m) ? 'Correo o contraseña incorrectos.'
+  : /not confirmed/i.test(m) ? 'Falta confirmar el correo: abre el enlace que te hemos enviado.'
+  : /already registered|registro cerrado/i.test(m) ? 'Esta app ya tiene su cuenta: usa “Entrar”.'
+  : /password/i.test(m) ? 'La contraseña debe tener al menos 8 caracteres.'
+  : /rate limit|too many/i.test(m) ? 'Demasiados intentos: espera unos minutos y prueba otra vez.'
+  : 'No se pudo completar. Comprueba la conexión y vuelve a intentarlo.';
+
+function askLogin() {
+  return new Promise(resolve => {
+    const dlg = $('auth-dialog'), msg = $('auth-msg');
+    dlg.addEventListener('cancel', e => e.preventDefault());
+    $('auth-form').onsubmit = async e => {
+      e.preventDefault();
+      const kind = e.submitter && e.submitter.value, email = $('auth-email').value.trim(), password = $('auth-pass').value;
+      msg.hidden = true; $('auth-form').querySelectorAll('button').forEach(b => b.disabled = true);
+      const { data, error } = kind === 'signup' ? await sb.auth.signUp({ email, password }) : await sb.auth.signInWithPassword({ email, password });
+      $('auth-form').querySelectorAll('button').forEach(b => b.disabled = false);
+      if (error) { msg.textContent = traducir(error.message); msg.hidden = false; return; }
+      if (!data.session) { msg.textContent = 'Te hemos enviado un correo: confirma y vuelve a pulsar “Entrar”.'; msg.hidden = false; return; }
+      session = data.session; dlg.close(); resolve();
+    };
+    dlg.showModal();
+  });
+}
+async function pull() {
+  setStatus('Sincronizando…');
+  const { data, error } = await sb.from('app_state').select('data,rev').maybeSingle();
+  if (error) { setStatus('Sin conexión: los cambios se guardan en este dispositivo', 'off'); return false; }
+  if (data) { state = migrate(data.data); rev = data.rev; persistLocal(); setStatus('Sincronizado', 'ok'); render(); return true; }
+  rev = 0; await push(); return true;   // primera vez: sube lo que hay en este dispositivo
+}
+function schedulePush() { if (!sb || !session) return; dirty = true; setStatus('Guardando…', 'busy'); clearTimeout(pushTimer); pushTimer = setTimeout(push, 700); }
+async function push() {
+  if (!sb || !session || pushing) return;
+  clearTimeout(pushTimer); pushing = true; dirty = false;
+  const row = { user_id: session.user.id, data: state, rev: rev + 1, updated_at: new Date().toISOString() };
+  const r = rev === 0 ? await sb.from('app_state').insert(row).select('rev')
+    : await sb.from('app_state').update(row).eq('user_id', session.user.id).eq('rev', rev).select('rev');
+  pushing = false;
+  if (r.error || !r.data || !r.data.length) {   // conflicto (otro dispositivo guardó antes) o sin conexión
+    if (r.error && !/duplicate|conflict/i.test(r.error.message)) { setStatus('Sin conexión: los cambios se guardan en este dispositivo', 'off'); return; }
+    await pull(); setStatus('Se actualizó desde otro dispositivo: repite el último cambio si no aparece', 'off'); return;
+  }
+  rev = r.data[0].rev; setStatus('Sincronizado', 'ok');
+  if (dirty) schedulePush();
+}
+async function initCloud() {
+  if (!CFG || !window.supabase) { ready = true; checkNewMonth(); return; }
+  sb = window.supabase.createClient(CFG.url, CFG.key, { auth: { persistSession: true, autoRefreshToken: true } });
+  session = (await sb.auth.getSession()).data.session;
+  sb.auth.onAuthStateChange((_e, s) => { session = s; });
+  if (!session) await askLogin();
+  await pull();
+  ready = true; render(); checkNewMonth();
+}
+document.addEventListener('visibilitychange', () => {
+  if (!sb || !session) return;
+  if (document.hidden) { if (dirty) push(); }
+  else if (!dirty && !pushing && !document.querySelector('dialog[open]')) pull();
+});
+$('logout').onclick = async () => {
+  if (!sb || !confirm('¿Cerrar sesión en este dispositivo?')) return;
+  await sb.auth.signOut(); try { localStorage.removeItem(KEY); } catch (e) {} location.reload();
+};
+initCloud();
     if (!$('goal-dialog').open) openGoals();
   }
 }
@@ -259,9 +416,79 @@ $('import').onchange = async e => {
   try {
     const d = JSON.parse(await f.text());
     if (!Array.isArray(d.models) || !Array.isArray(d.sales)) throw 0;
-    if (confirm('Esto reemplazará los datos actuales. ¿Continuar?')) { state = { models: d.models, sales: d.sales, goals: d.goals || {} }; save(); render(); }
+    if (confirm('Esto reemplazará los datos actuales. ¿Continuar?')) { state = migrate({ models: d.models, sales: d.sales, goals: d.goals || {}, seedVersion: d.seedVersion }); save(); render(); }
   } catch (_) { alert('Archivo no válido.'); }
   e.target.value = '';
 };
 
-setDefaultDate(); render(); checkNewMonth();
+setDefaultDate(); render();
+
+// ---------- Cuenta y sincronización (Supabase) ----------
+const CFG = window.SUPABASE_CONFIG;
+let sb = null, session = null, rev = 0, pushTimer = null, pushing = false, dirty = false;
+function setStatus(text, s = '') { $('sync').textContent = text; $('sync-dot').dataset.s = s; $('sync-dot').title = text; }
+const traducir = m => /invalid login/i.test(m) ? 'Correo o contraseña incorrectos.'
+  : /not confirmed/i.test(m) ? 'Falta confirmar el correo: abre el enlace que te hemos enviado.'
+  : /already registered|registro cerrado/i.test(m) ? 'Esta app ya tiene su cuenta: usa “Entrar”.'
+  : /password/i.test(m) ? 'La contraseña debe tener al menos 8 caracteres.'
+  : /rate limit|too many/i.test(m) ? 'Demasiados intentos: espera unos minutos y prueba otra vez.'
+  : 'No se pudo completar. Comprueba la conexión y vuelve a intentarlo.';
+
+function askLogin() {
+  return new Promise(resolve => {
+    const dlg = $('auth-dialog'), msg = $('auth-msg');
+    dlg.addEventListener('cancel', e => e.preventDefault());
+    $('auth-form').onsubmit = async e => {
+      e.preventDefault();
+      const kind = e.submitter && e.submitter.value, email = $('auth-email').value.trim(), password = $('auth-pass').value;
+      msg.hidden = true; $('auth-form').querySelectorAll('button').forEach(b => b.disabled = true);
+      const { data, error } = kind === 'signup' ? await sb.auth.signUp({ email, password }) : await sb.auth.signInWithPassword({ email, password });
+      $('auth-form').querySelectorAll('button').forEach(b => b.disabled = false);
+      if (error) { msg.textContent = traducir(error.message); msg.hidden = false; return; }
+      if (!data.session) { msg.textContent = 'Te hemos enviado un correo: confirma y vuelve a pulsar “Entrar”.'; msg.hidden = false; return; }
+      session = data.session; dlg.close(); resolve();
+    };
+    dlg.showModal();
+  });
+}
+async function pull() {
+  setStatus('Sincronizando…');
+  const { data, error } = await sb.from('app_state').select('data,rev').maybeSingle();
+  if (error) { setStatus('Sin conexión: los cambios se guardan en este dispositivo', 'off'); return false; }
+  if (data) { state = migrate(data.data); rev = data.rev; persistLocal(); setStatus('Sincronizado', 'ok'); render(); return true; }
+  rev = 0; await push(); return true;   // primera vez: sube lo que hay en este dispositivo
+}
+function schedulePush() { if (!sb || !session) return; dirty = true; setStatus('Guardando…', 'busy'); clearTimeout(pushTimer); pushTimer = setTimeout(push, 700); }
+async function push() {
+  if (!sb || !session || pushing) return;
+  clearTimeout(pushTimer); pushing = true; dirty = false;
+  const row = { user_id: session.user.id, data: state, rev: rev + 1, updated_at: new Date().toISOString() };
+  const r = rev === 0 ? await sb.from('app_state').insert(row).select('rev')
+    : await sb.from('app_state').update(row).eq('user_id', session.user.id).eq('rev', rev).select('rev');
+  pushing = false;
+  if (r.error || !r.data || !r.data.length) {   // conflicto (otro dispositivo guardó antes) o sin conexión
+    if (r.error && !/duplicate|conflict/i.test(r.error.message)) { setStatus('Sin conexión: los cambios se guardan en este dispositivo', 'off'); return; }
+    await pull(); setStatus('Se actualizó desde otro dispositivo: repite el último cambio si no aparece', 'off'); return;
+  }
+  rev = r.data[0].rev; setStatus('Sincronizado', 'ok');
+  if (dirty) schedulePush();
+}
+async function initCloud() {
+  if (!CFG || !window.supabase) { ready = true; checkNewMonth(); return; }
+  sb = window.supabase.createClient(CFG.url, CFG.key, { auth: { persistSession: true, autoRefreshToken: true } });
+  session = (await sb.auth.getSession()).data.session;
+  sb.auth.onAuthStateChange((_e, s) => { session = s; });
+  if (!session) await askLogin();
+  await pull();
+  ready = true; render(); checkNewMonth();
+}
+document.addEventListener('visibilitychange', () => {
+  if (!sb || !session) return;
+  if (document.hidden) { if (dirty) push(); }
+  else if (!dirty && !pushing && !document.querySelector('dialog[open]')) pull();
+});
+$('logout').onclick = async () => {
+  if (!sb || !confirm('¿Cerrar sesión en este dispositivo?')) return;
+  await sb.auth.signOut(); try { localStorage.removeItem(KEY); } catch (e) {} location.reload();
+};
+initCloud();

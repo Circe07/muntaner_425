@@ -12,7 +12,7 @@
 </head>
 <body>
 <header class="ag-navbar topbar">
-  <h1 class="headline">Ventas del mes</h1>
+  <h1 class="headline">Ventas del mes</h1><span id="sync-dot" class="sync-dot" role="status" aria-label="Estado de sincronización"></span>
   <div class="month">
     <button class="ag-navbar__action" id="prev" aria-label="Mes anterior">‹</button>
     <input class="ag-input body" type="month" id="month">
@@ -81,10 +81,11 @@
   </section>
 
   <section class="card ag-card ag-grain">
-    <h2 class="title3">Copia de seguridad</h2>
-    <p class="hint footnote">Los datos viven en este navegador. Descarga una copia de vez en cuando.</p>
+    <h2 class="title3">Cuenta y copia de seguridad</h2>
+    <p class="hint footnote">Estado: <strong id="sync">–</strong>. Tus datos se guardan en tu cuenta y los ves desde cualquier dispositivo.</p>
     <button class="ag-btn ag-btn--glass body" id="export">Descargar copia</button>
     <label class="file ag-btn ag-btn--glass body">Restaurar copia <input type="file" id="import" accept="application/json"></label>
+    <button class="ag-btn ag-btn--glass body" id="logout">Cerrar sesión</button>
   </section>
 </main>
 <dialog id="goal-dialog" class="ag-grain">
@@ -110,6 +111,18 @@
     <div class="row"><button class="ag-btn ag-btn--glass body" type="button" id="goal-cancel">Ahora no</button><button class="ag-btn ag-btn--primary body" value="ok">Guardar</button></div>
   </form>
 </dialog>
+<dialog id="auth-dialog" class="ag-grain">
+  <form id="auth-form">
+    <h2 class="title3">Entrar</h2>
+    <p class="hint footnote">Tus ventas se guardan en tu cuenta y las ves desde cualquier dispositivo. Primera vez: pulsa “Crear cuenta”.</p>
+    <label>Correo <input class="ag-input body" type="email" id="auth-email" autocomplete="email" required></label>
+    <label>Contraseña (mínimo 8) <input class="ag-input body" type="password" id="auth-pass" minlength="8" autocomplete="current-password" required></label>
+    <p class="ag-hint ag-hint--danger footnote" id="auth-msg" role="alert" hidden></p>
+    <div class="row"><button class="ag-btn ag-btn--glass body" value="signup">Crear cuenta</button><button class="ag-btn ag-btn--primary body" value="login">Entrar</button></div>
+  </form>
+</dialog>
+<script src="config.js"></script>
+<script src="vendor/supabase.js"></script>
 <script src="app.js"></script>
 </body>
 </html>
