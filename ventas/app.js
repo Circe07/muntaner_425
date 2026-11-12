@@ -6,14 +6,14 @@ const $ = id => document.getElementById(id);
 const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
 const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
-const SEED = [ // [nombre, gama] — gamas orientativas, se pueden cambiar en "Modelos"
-  ['Magic Pad 4 12,3" OLED', 'alta'], ['Honor 600 5G 8+512', 'alta'],
-  ['Pad 10 12,1" 8GB (1602942)', 'media'], ['Pad 10 12,1" 8GB (1668755)', 'media'],
-  ['600 Lite 5G (1668633)', 'media'], ['600 Lite 5G (1668702)', 'media'], ['600 Lite 5G (1668634)', 'media'],
-  ['600 Smart 6,87" 5G', 'media'], ['Magic 8 Lite (1611266)', 'media'], ['Magic 8 Lite (1611264)', 'media'],
-  ['Pad X8B 11" 4RAM/64GB', 'baja'], ['Pad X8B 11" 6RAM/256GB', 'baja'],
-  ['400 Smart 4G (1604932)', 'baja'], ['400 Smart 4G (1604933)', 'baja'], ['X5C Plus 4G', 'baja'],
+const OLD_SEED = ['Magic Pad 4 12,3" OLED','Honor 600 5G 8+512','Pad 10 12,1" 8GB (1602942)','Pad 10 12,1" 8GB (1668755)','600 Lite 5G (1668633)','600 Lite 5G (1668702)','600 Lite 5G (1668634)','600 Smart 6,87" 5G','Magic 8 Lite (1611266)','Magic 8 Lite (1611264)','Pad X8B 11" 4RAM/64GB','Pad X8B 11" 6RAM/256GB','400 Smart 4G (1604932)','400 Smart 4G (1604933)','X5C Plus 4G'];
+const SEED = [ // [nombre, gama]  (High=alta, Mid=media, Entry=baja)
+  ['Magic V6', 'alta'], ['M8 Pro', 'alta'], ['H600 Pro', 'alta'], ['H600', 'alta'], ['PAD 4', 'alta'],
+  ['H400', 'media'], ['M8 Lite', 'media'], ['600 Lite', 'media'], ['PAD X9 max', 'media'], ['PAD 10', 'media'],
+  ['H600 Smart', 'baja'], ['PAD X8b', 'baja'], ['PAD X9a', 'baja'], ['H400 Smart', 'baja'], ['PAD X8a', 'baja'], ['X5c Plus', 'baja'],
 ];
+// Acumulado de noviembre 2026 hasta el 10/11 (sin desglosar por modelo)
+const NOV = { goals: { alta: 30, media: 85, baja: 100 }, sold: { alta: 3, media: 19, baja: 19 } };
 const nowMonth = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`; };
 let state = load();
 let month = nowMonth();
@@ -22,8 +22,16 @@ function load() {
   let s = null;
   try { s = JSON.parse(localStorage.getItem(KEY)); } catch (e) {}
   if (!s || !s.models) s = { models: [], sales: [], goals: {} };
-  if (!s.seeded && s.models.length === 0) s.models = SEED.map(([name, gama]) => ({ id: uid(), name, gama }));
-  s.seeded = true;
+  if ((s.seedVersion || 0) < 2) {
+    const used = new Set(s.sales.map(x => x.modelId));
+    s.models = s.models.filter(m => !(OLD_SEED.includes(m.name) && !used.has(m.id)));
+    SEED.forEach(([name, gama]) => { if (!s.models.some(m => m.name === name)) s.models.push({ id: uid(), name, gama }); });
+    if (!s.goals['2026-11'] && !s.sales.some(x => x.date.startsWith('2026-11'))) {
+      s.goals['2026-11'] = NOV.goals;
+      GAMAS.forEach(g => s.sales.push({ id: uid(), date: '2026-11-10', modelId: null, name: 'Acumulado hasta 10/11 (sin desglosar)', gama: g, qty: NOV.sold[g] }));
+    }
+    s.seedVersion = 2;
+  }
   return s;
 }
 function save() { try { localStorage.setItem(KEY, JSON.stringify(state)); } catch (e) { alert('No se pudo guardar en el navegador.'); } }
@@ -87,7 +95,7 @@ function render() {
   $('by-model').tBodies[0].innerHTML = rows.length
     ? rows.map(r => `<tr><td>${esc(r.name)}</td><td><span class="tag ${r.gama}">${LABEL[r.gama]}</span></td><td class="n">${r.qty}</td></tr>`).join('')
     : '<tr><td colspan="3" class="empty">Sin datos</td></tr>';
-  const top = rows.filter(r => r.qty > 0).slice(0, 5);
+  const top = rows.filter(r => r.qty > 0 && !r.name.startsWith('Acumulado')).slice(0, 5);
   $('top').innerHTML = top.length ? top.map(r => `<li>${esc(r.name)} <span>${r.qty}</span></li>`).join('') : '<li class="empty">Aún no hay ventas este mes</li>';
 
   // listado de ventas
