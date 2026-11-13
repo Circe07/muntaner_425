@@ -24,6 +24,7 @@ form{display:flex;flex-wrap:wrap;gap:var(--space-3);align-items:flex-end}
 label{display:flex;flex-direction:column;gap:var(--space-1);font-size:13px;color:var(--ink-secondary)}
 label .ag-input{color:var(--ink)}
 #sale-qty{width:100px}
+#sale-lines{display:grid;gap:var(--space-3);flex:1 1 100%}.sale-line{display:flex;flex-wrap:wrap;gap:var(--space-3);align-items:flex-end}.sale-line+.sale-line{border-top:1px solid var(--glass-edge);padding-top:var(--space-3)}.sale-line>*{flex:1 1 100%}.sale-line [hidden],#sale-grand[hidden]{display:none}.sl-remove{align-self:flex-start;flex:none!important}
 select.ag-input{padding-right:var(--space-2)}
 .hint{color:var(--ink-secondary);margin:var(--space-2) 0 0}
 .empty{color:var(--ink-secondary)}

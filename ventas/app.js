@@ -195,10 +195,14 @@ function render() {
   const gs = currentGroups();
 
   // formulario de venta: importe solo si hay objetivos o comisiones en dinero
-  $('amount-wrap').hidden = !(ev && ev.hasRevenue);
-  const picked = $('sale-model').value;
-  $('sale-model').innerHTML = '<option value="" selected disabled>Elige un modelo…</option>' + state.models.map(m => { const g = groupOfName(m.name, m.gama).name; return `<option value="${m.id}">${esc(m.name)}${g ? ` (${esc(g)})` : ''}</option>`; }).join('');
-  if (state.models.some(m => m.id === picked)) $('sale-model').value = picked;
+  saleRevenue = !!(ev && ev.hasRevenue);
+  const opts = '<option value="" selected disabled>Elige un modelo…</option>' + state.models.map(m => { const g = groupOfName(m.name, m.gama).name; return `<option value="${m.id}">${esc(m.name)}${g ? ` (${esc(g)})` : ''}</option>`; }).join('');
+  document.querySelectorAll('.sale-line').forEach(row => {
+    row.querySelector('.sl-amount-wrap').hidden = !saleRevenue;
+    const sel = row.querySelector('.sl-model'), picked = sel.value;
+    sel.innerHTML = opts;
+    if (state.models.some(m => m.id === picked)) sel.value = picked;
+  });
   updateSaleForm();
   $('no-models').hidden = state.models.length > 0;
   $('sale-form').hidden = state.models.length === 0;
@@ -300,19 +304,34 @@ $('month').onchange = e => { if (e.target.value) { month = e.target.value; setDe
 
 // ---------- formulario de venta ----------
 let kind = 'venta', toastTimer = null;
-const getQty = () => Math.min(999, Math.max(0, parseInt($('sale-qty').value, 10) || 0));
-const needsAmount = () => !$('amount-wrap').hidden;
-const getAmount = () => { const v = parseFloat(String($('sale-amount').value).replace(',', '.')); return isFinite(v) && v > 0 ? v : 0; };
+let saleRevenue = false;
+const needsAmount = () => saleRevenue;
+const clampQty = v => Math.min(999, Math.max(0, parseInt(v, 10) || 0));
+const lineRows = () => [...document.querySelectorAll('.sale-line')];
+// una fila de la venta: modelo, unidades e importe por unidad
+function readLine(row) {
+  const v = parseFloat(String(row.querySelector('.sl-amount').value).replace(',', '.'));
+  return { row, modelId: row.querySelector('.sl-model').value, qty: clampQty(row.querySelector('.sl-qty').value), amount: isFinite(v) && v > 0 ? v : 0, rawAmount: String(row.querySelector('.sl-amount').value).trim() };
+}
+const lineEmpty = l => !l.modelId && l.qty === 0 && !l.rawAmount;
+const lineOk = l => !!l.modelId && l.qty > 0 && (!needsAmount() || l.amount > 0);
 function updateSaleForm() {
-  const ok = !!$('sale-model').value && getQty() > 0 && (!needsAmount() || getAmount() > 0);
+  const lines = lineRows().map(readLine), used = lines.filter(l => !lineEmpty(l));
+  const ok = used.length > 0 && used.every(lineOk);
   $('sale-submit').disabled = !ok;
-  $('sale-submit').textContent = kind === 'venta' ? 'Añadir venta' : 'Registrar devolución';
+  const n = used.length;
+  $('sale-submit').textContent = kind === 'venta' ? (n > 1 ? `Añadir venta (${n} modelos)` : 'Añadir venta') : (n > 1 ? `Registrar devolución (${n} modelos)` : 'Registrar devolución');
   $('sale-submit').classList.toggle('ag-btn--primary', kind === 'venta');
   $('sale-submit').classList.toggle('ag-btn--danger', kind !== 'venta');
-  $('qty-minus').disabled = getQty() <= 0;
-  const tot = getAmount() * getQty();      // el importe que se pide es el de UNA unidad; el total de la venta se calcula solo
-  $('amount-total').hidden = !(needsAmount() && tot > 0);
-  if (!$('amount-total').hidden) $('amount-total').textContent = `Total de esta venta: ${getQty()} × ${eur(getAmount())} = ${eur(tot)}`;
+  lines.forEach(l => {
+    l.row.querySelector('.sl-minus').disabled = l.qty <= 0;
+    const tot = l.amount * l.qty, el = l.row.querySelector('.sl-total');   // el importe que se pide es el de UNA unidad; el total de la línea se calcula solo
+    el.hidden = !(needsAmount() && tot > 0);
+    if (!el.hidden) el.textContent = `Total: ${l.qty} × ${eur(l.amount)} = ${eur(tot)}`;
+  });
+  const all = used.reduce((s, l) => s + l.amount * l.qty, 0);
+  $('sale-grand').hidden = !(n > 1 && needsAmount() && all > 0);
+  if (!$('sale-grand').hidden) $('sale-grand').textContent = `Total de la venta (${n} modelos): ${eur(all)}`;
 }
 function showToast(msg, undo) {
   $('toast-msg').textContent = msg; $('toast').hidden = false; $('toast-undo').hidden = !undo;
@@ -324,27 +343,55 @@ document.querySelectorAll('.seg-btn').forEach(b => b.onclick = () => {
   document.querySelectorAll('.seg-btn').forEach(x => x.setAttribute('aria-pressed', String(x === b)));
   updateSaleForm();
 });
-$('qty-plus').onclick = () => { $('sale-qty').value = Math.min(999, getQty() + 1); updateSaleForm(); };
-$('qty-minus').onclick = () => { $('sale-qty').value = Math.max(0, getQty() - 1); updateSaleForm(); };
-$('sale-qty').oninput = updateSaleForm;
-$('sale-amount').oninput = updateSaleForm;
-$('sale-model').onchange = updateSaleForm;
+const saleLines = $('sale-lines');
+saleLines.addEventListener('click', e => {
+  const row = e.target.closest('.sale-line'); if (!row) return;
+  const q = row.querySelector('.sl-qty');
+  if (e.target.closest('.sl-plus')) { q.value = clampQty(q.value) + 1 > 999 ? 999 : clampQty(q.value) + 1; updateSaleForm(); }
+  else if (e.target.closest('.sl-minus')) { q.value = Math.max(0, clampQty(q.value) - 1); updateSaleForm(); }
+  else if (e.target.closest('.sl-remove')) { row.remove(); updateSaleForm(); }
+});
+saleLines.addEventListener('input', updateSaleForm);
+saleLines.addEventListener('change', updateSaleForm);
+function addLine() {
+  const first = lineRows()[0], row = first.cloneNode(true);
+  row.querySelectorAll('[id]').forEach(el => el.removeAttribute('id'));
+  row.querySelector('.sl-model').value = ''; row.querySelector('.sl-qty').value = 0; row.querySelector('.sl-amount').value = ''; row.querySelector('.sl-total').hidden = true;
+  const rm = document.createElement('button'); rm.type = 'button'; rm.className = 'ag-btn ag-btn--glass body sl-remove'; rm.textContent = '✕ Quitar este modelo'; row.appendChild(rm);
+  saleLines.appendChild(row); row.querySelector('.sl-model').focus(); updateSaleForm();
+}
+$('add-line').onclick = addLine;
+function resetSaleLines() {
+  lineRows().slice(1).forEach(r => r.remove());
+  const f = lineRows()[0]; f.querySelector('.sl-model').value = ''; f.querySelector('.sl-qty').value = 0; f.querySelector('.sl-amount').value = '';
+}
 $('sale-form').onsubmit = e => {
   e.preventDefault();
-  const m = state.models.find(x => x.id === $('sale-model').value), qty = getQty(), date = $('sale-date').value;
-  if (!m || qty <= 0 || !date) return;           // sin modelo o con 0 unidades no se añade nada
-  if (needsAmount() && !(getAmount() > 0)) { alert('Pon el importe del modelo (€ por unidad): tus objetivos son en dinero.'); return; }
+  const date = $('sale-date').value, lines = lineRows().map(readLine).filter(l => !lineEmpty(l));
+  if (!lines.length || !date) return;
+  if (lines.some(l => !l.modelId || l.qty <= 0)) return;           // sin modelo o con 0 unidades no se añade nada
+  if (needsAmount() && lines.some(l => !(l.amount > 0))) { alert('Pon el importe del modelo (€ por unidad) en cada línea: tus objetivos son en dinero.'); return; }
+  const key = periodKeyFor(date);
   if (kind === 'devolucion') {
-    const key = periodKeyFor(date), have = state.sales.filter(s => periodKeyFor(s.date) === key && s.name === m.name).reduce((a, s) => a + s.qty, 0);
-    if (qty > have) { alert(`En ${monthName(key)} solo hay ${Math.max(0, have)} uds. de ${m.name}. Pon la fecha en el periodo de la venta.`); return; }
+    const want = new Map();
+    for (const l of lines) { const m = state.models.find(x => x.id === l.modelId); want.set(m.name, (want.get(m.name) || 0) + l.qty); }
+    for (const [name, qty] of want) {
+      const have = state.sales.filter(s => periodKeyFor(s.date) === key && s.name === name).reduce((a, s) => a + s.qty, 0);
+      if (qty > have) { alert(`En ${monthName(key)} solo hay ${Math.max(0, have)} uds. de ${name}. Pon la fecha en el periodo de la venta.`); return; }
+    }
   }
-  const sale = { id: uid(), date, modelId: m.id, name: m.name, gama: m.gama, qty: kind === 'venta' ? qty : -qty };
-  if (needsAmount()) sale.amount = Math.round(getAmount() * qty * 100) / 100 * (kind === 'venta' ? 1 : -1);
-  state.sales.push(sale); save();
+  const made = lines.map(l => {
+    const m = state.models.find(x => x.id === l.modelId);
+    const sale = { id: uid(), date, modelId: m.id, name: m.name, gama: m.gama, qty: kind === 'venta' ? l.qty : -l.qty };
+    if (needsAmount()) sale.amount = Math.round(l.amount * l.qty * 100) / 100 * (kind === 'venta' ? 1 : -1);
+    return sale;
+  });
+  state.sales.push(...made); save();
   month = periodKeyFor(date);
-  $('sale-qty').value = 0; $('sale-model').value = ''; $('sale-amount').value = '';
+  resetSaleLines();
   render(); updateSaleForm();
-  showToast(`${kind === 'venta' ? 'Añadidas' : 'Devueltas'} ${qty} × ${m.name}`, () => { state.sales = state.sales.filter(s => s.id !== sale.id); save(); render(); });
+  const uds = lines.reduce((a, l) => a + l.qty, 0), ids = new Set(made.map(s => s.id));
+  showToast(`${kind === 'venta' ? 'Añadidas' : 'Devueltas'} ` + (made.length === 1 ? `${uds} × ${made[0].name}` : `${uds} uds. de ${made.length} modelos`), () => { state.sales = state.sales.filter(s => !ids.has(s.id)); save(); render(); });
 };
 $('model-form').onsubmit = e => {
   e.preventDefault();

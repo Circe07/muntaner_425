@@ -37,17 +37,23 @@
         <button type="button" class="seg-btn" data-kind="devolucion" aria-pressed="false">Devolución</button>
       </div>
       <label>Fecha <input class="ag-input body" type="date" id="sale-date" required></label>
-      <label>Modelo <select class="ag-input body" id="sale-model"></select></label>
-      <div class="qty">
-        <span class="qty-label">Unidades</span>
-        <div class="stepper">
-          <button type="button" class="ag-btn ag-btn--glass" id="qty-minus" aria-label="Quitar una unidad">−</button>
-          <input class="ag-input body" type="number" id="sale-qty" min="0" max="999" value="0" inputmode="numeric" aria-label="Unidades">
-          <button type="button" class="ag-btn ag-btn--glass" id="qty-plus" aria-label="Añadir una unidad">+</button>
+      <div id="sale-lines">
+        <div class="sale-line">
+          <label>Modelo <select class="ag-input body sl-model" id="sale-model"></select></label>
+          <div class="qty">
+            <span class="qty-label">Unidades</span>
+            <div class="stepper">
+              <button type="button" class="ag-btn ag-btn--glass sl-minus" id="qty-minus" aria-label="Quitar una unidad">−</button>
+              <input class="ag-input body sl-qty" type="number" id="sale-qty" min="0" max="999" value="0" inputmode="numeric" aria-label="Unidades">
+              <button type="button" class="ag-btn ag-btn--glass sl-plus" id="qty-plus" aria-label="Añadir una unidad">+</button>
+            </div>
+          </div>
+          <label class="sl-amount-wrap" id="amount-wrap" hidden>Importe del modelo (€ por unidad) <input class="ag-input body sl-amount" type="number" id="sale-amount" min="0" step="any" inputmode="decimal" placeholder="Ej. 349"></label>
+          <p class="hint footnote sl-total" id="amount-total" hidden></p>
         </div>
       </div>
-      <label id="amount-wrap" hidden>Importe del modelo (€ por unidad) <input class="ag-input body" type="number" id="sale-amount" min="0" step="any" inputmode="decimal" placeholder="Ej. 349"></label>
-      <p class="hint footnote" id="amount-total" hidden></p>
+      <p class="hint footnote" id="sale-grand" hidden></p>
+      <button type="button" class="ag-btn ag-btn--glass body" id="add-line">+ Añadir otro modelo a esta venta</button>
       <button class="ag-btn ag-btn--primary body" id="sale-submit" disabled>Añadir venta</button>
     </form>
     <p class="hint footnote" id="no-models" hidden>Primero añade algún modelo en “Modelos”.</p>
