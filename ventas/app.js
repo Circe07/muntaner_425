@@ -315,7 +315,7 @@ function render() {
         const extra = (!m.gama || gs.some(g => g.id === m.gama)) ? '' : `<option value="${esc(m.gama)}" selected>${esc(LABEL[m.gama] || m.gama)}</option>`;
         const guess = Report.typeOf(Report.deviceType(m.name, groupOfName(m.name, m.gama).name)).label;
         const tipoSel = `<select class="ag-input footnote" data-tipo="${m.id}" aria-label="Tipo de producto"><option value="">Tipo: ${esc(guess)}</option>${Report.TYPES.map(t => `<option value="${t.key}"${m.tipo === t.key ? ' selected' : ''}>${t.label}</option>`).join('')}</select>`;
-        return `<li><span>${esc(m.name)}${m.alias ? ` <small class="amt">→ ${esc(m.alias)}</small>` : ''}</span><span><button class="del" aria-label="Nombre en el reporte" data-alias="${m.id}" title="Nombre en el reporte de WhatsApp">✎</button><select class="ag-input footnote" data-gama="${m.id}" aria-label="Grupo">${extra}${gOpts(m.gama)}</select>${tipoSel}<button class="del" aria-label="Quitar modelo" data-model="${m.id}" title="Quitar modelo">✕</button></span></li>`;
+        return `<li><span>${esc(m.name)}${m.alias ? ` <small class="amt">→ ${esc(m.alias)}</small>` : ''}${m.price ? ` <small class="amt">${eur(m.price)}</small>` : ''}</span><span><button class="del" aria-label="Precio del modelo" data-price="${m.id}" title="Precio de venta (PVP): se rellena solo al vender">€</button><button class="del" aria-label="Nombre en el reporte" data-alias="${m.id}" title="Nombre en el reporte de WhatsApp">✎</button><select class="ag-input footnote" data-gama="${m.id}" aria-label="Grupo">${extra}${gOpts(m.gama)}</select>${tipoSel}<button class="del" aria-label="Quitar modelo" data-model="${m.id}" title="Quitar modelo">✕</button></span></li>`;
       }).join('')
     : `<li class="empty">${state.models.length ? 'No hay modelos en esta clase' : 'No hay modelos todavía'}</li>`;
   $('models-clear').hidden = !state.models.length;
@@ -387,20 +387,27 @@ saleLines.addEventListener('click', e => {
   else if (e.target.closest('.sl-remove')) { row.remove(); updateSaleForm(); }
 });
 saleLines.addEventListener('input', updateSaleForm);
-saleLines.addEventListener('change', updateSaleForm);
+saleLines.addEventListener('change', e => {
+  if (e.target.classList.contains('sl-model')) {          // al elegir modelo, el importe por unidad se rellena con su PVP (si lo tiene)
+    const row = e.target.closest('.sale-line'), inp = row.querySelector('.sl-amount'), m = state.models.find(x => x.id === e.target.value);
+    if (!inp.value || inp.dataset.auto === '1') { if (m && m.price) { inp.value = m.price; inp.dataset.auto = '1'; } else { inp.value = ''; delete inp.dataset.auto; } }
+  }
+  updateSaleForm();
+});
+saleLines.addEventListener('input', e => { if (e.target.classList.contains('sl-amount')) delete e.target.dataset.auto; });
 saleLines.addEventListener('click', e => { const chip = e.target.closest('.cls-chip'), row = e.target.closest('.sale-line'); if (!chip || !row) return; row.dataset.cls = chip.dataset.cls; fillRow(row); updateSaleForm(); });
 $('models-filter').addEventListener('click', e => { const chip = e.target.closest('.cls-chip'); if (!chip) return; $('models-filter').dataset.cls = chip.dataset.cls; render(); });
 function addLine() {
   const first = lineRows()[0], row = first.cloneNode(true);
   row.querySelectorAll('[id]').forEach(el => el.removeAttribute('id'));
-  row.dataset.cls = ''; fillRow(row); row.querySelector('.sl-model').value = ''; row.querySelector('.sl-qty').value = 0; row.querySelector('.sl-amount').value = ''; row.querySelector('.sl-total').hidden = true;
+  row.dataset.cls = ''; fillRow(row); row.querySelector('.sl-model').value = ''; row.querySelector('.sl-qty').value = 0; row.querySelector('.sl-amount').value = ''; delete row.querySelector('.sl-amount').dataset.auto; row.querySelector('.sl-total').hidden = true;
   const rm = document.createElement('button'); rm.type = 'button'; rm.className = 'ag-btn ag-btn--glass body sl-remove'; rm.textContent = '✕ Quitar este modelo'; row.appendChild(rm);
   saleLines.appendChild(row); row.querySelector('.sl-model').focus(); updateSaleForm();
 }
 $('add-line').onclick = addLine;
 function resetSaleLines() {
   lineRows().slice(1).forEach(r => r.remove());
-  const f = lineRows()[0]; f.querySelector('.sl-model').value = ''; f.querySelector('.sl-qty').value = 0; f.querySelector('.sl-amount').value = '';
+  const f = lineRows()[0]; f.querySelector('.sl-model').value = ''; f.querySelector('.sl-qty').value = 0; f.querySelector('.sl-amount').value = ''; delete f.querySelector('.sl-amount').dataset.auto;
 }
 $('sale-form').onsubmit = e => {
   e.preventDefault();
@@ -457,6 +464,7 @@ $('mi-add').onclick = () => {
     else if ((x.tipo && !m.tipo) || (x.alias && !m.alias)) updated++;
     if (x.tipo && !m.tipo) m.tipo = x.tipo;
     if (x.alias && !m.alias) m.alias = x.alias;
+    if (x.price && m.price !== x.price) { m.price = x.price; if (!added) updated++; }
     if (x.group) {
       const g = groups.find(k => Plan.slug(k.id) === Plan.slug(x.group) || Plan.slug(k.name) === Plan.slug(x.group));
       if (g) assignModelGroup(m, g.id); else warn.push(`«${x.name}»: la categoría «${x.group}» no está en tus objetivos de este mes; la ignoro.`);
@@ -648,11 +656,13 @@ function commitPlan(plan, replaceModels, mode, editIndex, usePeriod) {
   plan.groups.forEach(g => g.models.forEach(n => names.set(norm(n), { name: n, gama: g.id })));
   const addScope = sc => (sc.models || []).forEach(n => { if (!names.has(norm(n))) names.set(norm(n), { name: n, gama: '' }); });
   plan.objectives.forEach(o => addScope(o.scope)); plan.unit_incentives.forEach(r => addScope(r.scope)); plan.commissions.forEach(c => addScope(c.scope));
+  (plan.prices || []).forEach(x => { if (!names.has(norm(x.model))) names.set(norm(x.model), { name: x.model, gama: '' }); });
   names.forEach(({ name, gama }, k) => {
     const m = state.models.find(x => norm(x.name) === k);
     if (m) { if (gama) { m.gama = gama; state.sales.forEach(s => { if (s.modelId === m.id) s.gama = gama; }); } }
     else state.models.push({ id: uid(), name, gama });
   });
+  (plan.prices || []).forEach(x => { const m = state.models.find(k => norm(k.name) === norm(x.model)); if (m) m.price = x.price; });   // PVP del documento
   if (replaceModels) {
     const used = new Set(state.sales.map(s => norm(s.name)));
     state.models = state.models.filter(m => names.has(norm(m.name)) || used.has(norm(m.name)));
@@ -710,6 +720,15 @@ function assignModelGroup(m, groupId) {
   state.sales.forEach(s => { if (s.modelId === m.id) s.gama = groupId; });
 }
 $('models').addEventListener('click', e => {
+  const pb = e.target.closest('[data-price]');
+  if (pb) {
+    const m = state.models.find(x => x.id === pb.dataset.price); if (!m) return;
+    const v = prompt(`Precio de venta (PVP) de «${m.name}» en €. Se pondrá solo al registrar una venta (vacío = sin precio):`, m.price || '');
+    if (v === null) return;
+    const n = parseFloat(String(v).replace(',', '.'));
+    if (isFinite(n) && n > 0) m.price = Math.round(n * 100) / 100; else delete m.price;
+    save(); render(); return;
+  }
   const b = e.target.closest('[data-alias]'); if (!b) return;
   const m = state.models.find(x => x.id === b.dataset.alias); if (!m) return;
   const v = prompt(`Nombre de «${m.name}» en el reporte de WhatsApp (vacío = el mismo):`, m.alias || m.name);

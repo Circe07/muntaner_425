@@ -217,10 +217,15 @@
     [...unit_incentives, ...commissions].forEach(x => { if (x.condition) x.condition.objectives.forEach(id => { refStart.set(id, Math.min(refStart.has(id) ? refStart.get(id) : Infinity, Math.min(...x.condition.steps.map(s => s.from)))); }); });
     objectives.forEach(o => { if (!(o.payout.reward > 0) && !explicitStart.has(o.id) && refStart.has(o.id)) o.payout.start_pct = refStart.get(o.id); });
     if (!objectives.length && !unit_incentives.length && !commissions.length) errors.push('No encuentro ningún objetivo ni incentivo en el plan.');
+    // precios de venta (PVP) por modelo: lista "precios" y/o campo "pvp" dentro de un incentivo por unidad
+    const prices = new Map();
+    const setPrice = (m, v) => { const name = String(m ?? '').trim().slice(0, 80), n = toNum(v); if (name && isFinite(n) && n > 0 && !prices.has(norm(name))) prices.set(norm(name), { model: name, price: Math.round(n * 100) / 100 }); };
+    arr(pick(raw, 'precios', 'prices', 'pvp')).slice(0, 300).forEach(x => { if (x && typeof x === 'object') setPrice(pick(x, 'modelo', 'model', 'nombre', 'name'), pick(x, 'pvp', 'precio', 'price', 'importe')); });
+    arr(pick(raw, 'incentivos_por_unidad', 'unit_incentives', 'incentivos_unitarios')).forEach(r => { if (r && typeof r === 'object') { const v = pick(r, 'pvp', 'precio', 'price'); if (v !== undefined) strs(pick(r, 'modelos', 'models', 'modelo', 'model')).forEach(m => setPrice(m, v)); } });
     const notes = strs(pick(raw, 'notas', 'notes', 'supuestos', 'dudas')).slice(0, 12).map(x => x.slice(0, 300));
     if (errors.length) return { plan: null, errors, warnings };
     return {
-      plan: { v: 2, name: planName, period: planPeriod, brand: String(pick(raw, 'marca', 'brand') ?? '').trim().slice(0, 60), groups, objectives, unit_incentives, commissions, notes },
+      plan: { v: 2, name: planName, period: planPeriod, brand: String(pick(raw, 'marca', 'brand') ?? '').trim().slice(0, 60), groups, objectives, unit_incentives, commissions, prices: [...prices.values()], notes },
       errors, warnings
     };
   }
@@ -369,6 +374,7 @@
   }
   function describePlan(plan) {
     const lines = [];
+    if ((plan.prices || []).length) lines.push(`Precios de venta (PVP) de ${plan.prices.length} modelo${plan.prices.length === 1 ? '' : 's'}: se rellenan solos al registrar sus ventas (puedes cambiarlos).`);
     if (plan.name || plan.period) lines.push(`Plan${plan.name ? ' «' + plan.name + '»' : ''}${plan.period ? ' — solo cuentan las ventas ' + periodText(plan.period) : ''}.`);
     plan.objectives.forEach(o => {
       const p = o.payout;
@@ -428,6 +434,7 @@
       { nombre: 'Modelo B (campaña: doble desde el 100%)', modelos: ['Modelo B'], importes: [7], condicion: { objetivos: ['uds', 'valor'], escalones: [{ desde_pct: 90, paga_pct: 60 }, { desde_pct: 100, paga_pct: 200 }] } },
       { nombre: 'Auriculares', modelos: ['Auricular 1', 'Auricular 2'], modo: 'retroactivo', tramos: [{ desde_unidades: 1, importe: 1.5 }, { desde_unidades: 10, importe: 2.5 }] }
     ],
+    precios: [{ modelo: 'Modelo A', pvp: 699 }, { modelo: 'Modelo B', pvp: 349.9 }],
     notas: ['El texto no da las metas (son personales): las dejé en 0 para que las ponga el usuario.', 'La política de «estrellas» depende de otro departamento y no se puede calcular: no la incluí.']
   };
   const EXAMPLE_D = {
@@ -495,6 +502,7 @@
       '6. PERIODO: si el texto indica en qué fechas cuentan los objetivos (p. ej. «del 6 de octubre al 2 de noviembre», «mes de 5 semanas», «cierra el día 3», una semana, una quincena, una campaña), pon "periodo" con fechas AAAA-MM-DD; la app solo contará las ventas de esas fechas. Deduce el año con el MES y la fecha de hoy que te doy abajo. Si pone «esta semana», resuélvela con esa fecha (semana = lunes a domingo). Si el texto NO indica periodo, NO pongas "periodo": se usará el mes natural (del día 1 al último). SEMANAS: si las metas vienen por semana («W45», «S45», «semana 46»…), son semanas ISO (lunes a domingo): usa la tabla de semanas que te doy más abajo y haz UN objetivo por semana con su "periodo" (desde el lunes hasta el domingo). Si el texto define el mes como esas semanas (p. ej. W45–W48 y «Total mes»), pon además el "periodo" del plan desde el lunes de la primera semana hasta el domingo de la última, y el objetivo del total del mes sin periodo propio.',
       '7. MODELOS Y CATEGORÍAS: saca los modelos DEL TEXTO. Usa SOLO modelos que aparezcan en el texto: NUNCA añadas modelos de memoria, de otra marca ni de ningún ejemplo de este mensaje. Si hay objetivos por categoría (móviles, tablets, relojes o wearables, portátiles, auriculares, TV, accesorios…), crea un grupo por cada categoría y coloca en su "modelos" TODOS los modelos que cite el texto, cada uno en la categoría que le corresponda según el tipo de producto (usa lo que sepas del producto: «Pad/Tab» = tablet, «Watch/Band/Fit» = reloj o pulsera, «Book/Laptop» = portátil, «Buds/TWS» = auriculares, un teléfono = móvil…). Si el texto ya trae una tabla modelo → categoría, respétala tal cual. Si no sabes a qué categoría pertenece un modelo, déjalo fuera de los grupos y apúntalo en "notas". Si el texto NO lista modelos (solo da metas por categoría, p. ej. «HHP», «Tab», «Wearables»), crea igualmente el grupo con "modelos": [] y su "tipo": la app repartirá las ventas por tipo de producto sola. Traduce siglas: HHP = teléfonos móviles ("moviles"), Tab/Tablets = "tablets", Wearables/IoT = "relojes".',
       '8. DINERO: las cantidades en dinero van solo como número aunque el texto use $, £ o €; no conviertas moneda. Si el texto no usa € anótalo en "notas" (la app muestra €).',
+      '9. PRECIOS (PVP): si el texto trae el precio de venta al público de los modelos (columnas como «PVP», «precio», «P.V.P.», «RRP»), ponlos en "precios", uno por modelo, con el número tal cual (el que se usa para calcular las ventas; si hay precio con y sin IVA, el que se usa para el cálculo; si no lo sabes, el PVP). No inventes precios: si un modelo no tiene precio, no lo pongas. La app los usará para rellenar el importe al registrar cada venta.',
       '',
       'FORMATO DEL JSON (todos los campos salvo "objetivos" o "incentivos_por_unidad" son opcionales)',
       '{',
@@ -518,6 +526,7 @@
       '    "condicion": { "objetivos": ["id1", "id2"], "escalones": [ { "desde_pct": 90, "paga_pct": 60 }, { "desde_pct": 100, "paga_pct": 100 } ] }',
       '  } ],',
       '  "comisiones": [ { "nombre": "…", "ambito": { "grupos": ["…"] }, "porcentaje": 2 } ],',
+      '  "precios": [ { "modelo": "Modelo X", "pvp": 349.9 } ],',
       '  "notas": ["suposiciones o dudas, una frase cada una"]',
       '}',
       '',
@@ -537,6 +546,7 @@
       '- condicion (en incentivos por unidad y en comisiones): el premio se multiplica según el cumplimiento de uno o varios objetivos (vale el que más cumplas). "paga_pct" es el % del premio que se cobra: menos del primer escalón = 0. Ej.: «menos del 90% nada; 90-99% el 60%; 100% o más el 100%» → escalones 90→60 y 100→100. Un «incentivo doble» a partir del 100% se escribe con paga_pct 200 en ese escalón.',
       '- Si el texto dice que la meta puede alcanzarse «en unidades O en valor», crea DOS objetivos (uno de cada métrica, sin pago) y pon los dos en "condicion.objetivos".',
       '- comisiones: un % sobre el dinero vendido de ese ámbito.',
+      '- precios: lista opcional con el PVP de cada modelo (ver regla 9). Se escribe el mismo nombre de modelo que en el resto del JSON.',
       '- Los "id" van en minúsculas, sin espacios ni tildes y sin repetirse.',
       '- Si algo del texto NO cabe en este formato, hazlo encajar lo mejor posible y describe en "notas" lo que no has podido reflejar.',
       '',
@@ -575,7 +585,7 @@
   // ---------- lista de modelos con la ayuda de la IA de la persona ----------
   function buildModelsPrompt(opts) {
     const o = opts || {}, groups = (o.groups || []).slice(0, 40);
-    const ej = { version: 1, modelos: [{ nombre: 'Galaxy S25 Ultra', tipo: 'moviles', grupo: 'HHP' }, { nombre: 'Galaxy Tab S10', tipo: 'tablets' }, { nombre: 'Galaxy Watch 8', tipo: 'relojes', nombre_reporte: 'Watch 8' }], notas: ['«Galaxy Buds» no encaja en ninguna categoría de mi lista: lo he puesto como auriculares.'] };
+    const ej = { version: 1, modelos: [{ nombre: 'Galaxy S25 Ultra', tipo: 'moviles', grupo: 'HHP', pvp: 1299 }, { nombre: 'Galaxy Tab S10', tipo: 'tablets' }, { nombre: 'Galaxy Watch 8', tipo: 'relojes', nombre_reporte: 'Watch 8' }], notas: ['«Galaxy Buds» no encaja en ninguna categoría de mi lista: lo he puesto como auriculares.'] };
     return [
       'TAREA: convierte la lista de modelos que hay AL FINAL de este mensaje (texto o foto/captura adjunta) en un JSON con el formato de abajo. Es para mi app "Ventas del mes", que lo lee automáticamente.',
       '',
@@ -587,10 +597,11 @@
       '5. "tipo" es el tipo de producto: "moviles" (teléfonos), "tablets", "relojes" (relojes, pulseras, wearables), "portatiles", "auriculares", "tv", "accesorios". Dedúcelo del producto; si mi lista ya viene agrupada por categorías, respétalas.',
       '6. "grupo" es opcional: ponlo solo si mi lista asigna ese modelo a una de estas categorías y escríbela EXACTAMENTE como aquí: ' + (groups.length ? groups.map(g => '«' + g + '»').join(', ') : '(no hay ninguna todavía; no pongas "grupo")') + '.',
       '7. "nombre_reporte" es opcional: el nombre comercial corto con el que quiero que salga el modelo en mi reporte diario, SIN la marca. Si mi lista no lo indica, no lo pongas.',
+      '8. "pvp" es opcional: el precio de venta al público del modelo si mi lista lo trae (columna PVP, precio…), solo el número (349.9). Si no lo trae, no lo pongas ni lo inventes.',
       '',
       'FORMATO DEL JSON',
       '{ "version": 1,',
-      '  "modelos": [ { "nombre": "Modelo", "tipo": "moviles", "grupo": "(opcional)", "nombre_reporte": "(opcional)" } ],',
+      '  "modelos": [ { "nombre": "Modelo", "tipo": "moviles", "grupo": "(opcional)", "nombre_reporte": "(opcional)", "pvp": 349.9 } ],',
       '  "notas": ["suposiciones o dudas, una frase cada una"] }',
       '',
       'EJEMPLO (solo para ver el formato; NO uses estos modelos):',
@@ -616,9 +627,10 @@
       const tipo = inferType(pick(obj, 'tipo', 'type')) || catType || '';
       const grupo = String(pick(obj, 'grupo', 'group', 'categoria', 'categoría') ?? catName ?? '').trim();
       const alias = String(pick(obj, 'nombre_reporte', 'alias', 'report_name') ?? '').trim().slice(0, 60);
+      const pv = toNum(pick(obj, 'pvp', 'precio', 'price'));
       const k = norm(name);
       if (out.has(k)) { warnings.push(`«${name}» aparece repetido; lo cuento una vez.`); return; }
-      out.set(k, { name, tipo, group: grupo, alias: alias && norm(alias) !== k ? alias : '' });
+      out.set(k, { name, tipo, group: grupo, alias: alias && norm(alias) !== k ? alias : '', price: isFinite(pv) && pv > 0 ? Math.round(pv * 100) / 100 : 0 });
     };
     arr(pick(raw, 'modelos', 'models')).slice(0, 300).forEach(g => add(g));
     arr(pick(raw, 'categorias', 'categorías', 'categories', 'grupos', 'groups')).slice(0, 40).forEach(c => {
