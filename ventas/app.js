@@ -310,6 +310,9 @@ function updateSaleForm() {
   $('sale-submit').classList.toggle('ag-btn--primary', kind === 'venta');
   $('sale-submit').classList.toggle('ag-btn--danger', kind !== 'venta');
   $('qty-minus').disabled = getQty() <= 0;
+  const tot = getAmount() * getQty();      // el importe que se pide es el de UNA unidad; el total de la venta se calcula solo
+  $('amount-total').hidden = !(needsAmount() && tot > 0);
+  if (!$('amount-total').hidden) $('amount-total').textContent = `Total de esta venta: ${getQty()} × ${eur(getAmount())} = ${eur(tot)}`;
 }
 function showToast(msg, undo) {
   $('toast-msg').textContent = msg; $('toast').hidden = false; $('toast-undo').hidden = !undo;
@@ -330,17 +333,17 @@ $('sale-form').onsubmit = e => {
   e.preventDefault();
   const m = state.models.find(x => x.id === $('sale-model').value), qty = getQty(), date = $('sale-date').value;
   if (!m || qty <= 0 || !date) return;           // sin modelo o con 0 unidades no se añade nada
-  if (needsAmount() && !(getAmount() > 0)) { alert('Pon el importe total de la venta (€): tus objetivos son en dinero.'); return; }
+  if (needsAmount() && !(getAmount() > 0)) { alert('Pon el importe del modelo (€ por unidad): tus objetivos son en dinero.'); return; }
   if (kind === 'devolucion') {
     const key = periodKeyFor(date), have = state.sales.filter(s => periodKeyFor(s.date) === key && s.name === m.name).reduce((a, s) => a + s.qty, 0);
     if (qty > have) { alert(`En ${monthName(key)} solo hay ${Math.max(0, have)} uds. de ${m.name}. Pon la fecha en el periodo de la venta.`); return; }
   }
   const sale = { id: uid(), date, modelId: m.id, name: m.name, gama: m.gama, qty: kind === 'venta' ? qty : -qty };
-  if (needsAmount()) sale.amount = kind === 'venta' ? getAmount() : -getAmount();
+  if (needsAmount()) sale.amount = Math.round(getAmount() * qty * 100) / 100 * (kind === 'venta' ? 1 : -1);
   state.sales.push(sale); save();
   month = periodKeyFor(date);
   $('sale-qty').value = 0; $('sale-model').value = ''; $('sale-amount').value = '';
-  render();
+  render(); updateSaleForm();
   showToast(`${kind === 'venta' ? 'Añadidas' : 'Devueltas'} ${qty} × ${m.name}`, () => { state.sales = state.sales.filter(s => s.id !== sale.id); save(); render(); });
 };
 $('model-form').onsubmit = e => {

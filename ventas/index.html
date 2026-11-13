@@ -46,7 +46,8 @@
           <button type="button" class="ag-btn ag-btn--glass" id="qty-plus" aria-label="Añadir una unidad">+</button>
         </div>
       </div>
-      <label id="amount-wrap" hidden>Importe total de la venta (€) <input class="ag-input body" type="number" id="sale-amount" min="0" step="any" inputmode="decimal" placeholder="Ej. 349"></label>
+      <label id="amount-wrap" hidden>Importe del modelo (€ por unidad) <input class="ag-input body" type="number" id="sale-amount" min="0" step="any" inputmode="decimal" placeholder="Ej. 349"></label>
+      <p class="hint footnote" id="amount-total" hidden></p>
       <button class="ag-btn ag-btn--primary body" id="sale-submit" disabled>Añadir venta</button>
     </form>
     <p class="hint footnote" id="no-models" hidden>Primero añade algún modelo en “Modelos”.</p>
