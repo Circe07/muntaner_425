@@ -39,6 +39,7 @@
       <label>Fecha <input class="ag-input body" type="date" id="sale-date" required></label>
       <div id="sale-lines">
         <div class="sale-line">
+          <label class="sl-class-wrap" id="class-wrap" hidden>Clase <select class="ag-input body sl-class" id="sale-class"></select></label>
           <label>Modelo <select class="ag-input body sl-model" id="sale-model"></select></label>
           <div class="qty">
             <span class="qty-label">Unidades</span>
@@ -106,6 +107,7 @@
       </label>
       <button class="ag-btn ag-btn--primary body">Añadir modelo</button>
     </form>
+    <label id="models-filter-wrap" hidden>Ver la clase <select class="ag-input body" id="models-filter"></select></label>
     <ul id="models" class="models"></ul>
     <details class="howto" id="models-ai">
       <summary>Añadir muchos modelos con tu IA</summary>
