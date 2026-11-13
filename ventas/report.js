@@ -102,7 +102,7 @@
     TYPES.forEach(t => {
       const items = sold.get(t.key);
       if (!items && t.key !== 'moviles' && t.key !== 'tablets') return;       // Telefonía y Tablets salen siempre
-      L.push(`${SHOP_LABEL[t.key]}:`);
+      L.push(`${SHOP_LABEL[t.key]}: ${items ? [...items.values()].reduce((a, q) => a + q, 0) : 0}`);   // unidades de la categoría
       if (items) [...items.entries()].sort((a, b) => b[1] - a[1]).forEach(([name, q]) => L.push(`${q}-${name}`));
       L.push('');
     });

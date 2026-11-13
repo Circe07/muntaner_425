@@ -825,7 +825,7 @@ function paintReport() {
   $('rp-store').hidden = !store; $('rp-sum').hidden = store;
   const r = buildDayReport();
   $('rp-text').value = r.empty ? '' : r.text;
-  $('rp-text').rows = r.empty ? 3 : Math.min(24, r.text.split('\n').length + 1);
+  $('rp-text').rows = r.empty ? 3 : Math.min(12, r.text.split('\n').length + 1);
   $('rp-empty').hidden = !r.empty;
   $('rp-copy').disabled = r.empty; $('rp-copy').textContent = 'Copiar reporte';
   $('rp-wa').href = r.empty ? '#' : 'https://wa.me/?text=' + encodeURIComponent(r.text);
