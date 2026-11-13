@@ -572,7 +572,65 @@
     ].join('\n');
   }
 
-  const api = { LEGACY_GROUPS, normalizePlan, extractJson, fromLegacy, evaluate, evaluateAll, describePlan, buildPrompt, matchesScope, groupIdsOf, payFraction, inPeriod, periodText, norm, slug, eur, eur0, fmtV, EXAMPLE_A, EXAMPLE_B, EXAMPLE_C, EXAMPLE_D, EXAMPLE_E, EXAMPLE_F, isoWeek, inferType };
+  // ---------- lista de modelos con la ayuda de la IA de la persona ----------
+  function buildModelsPrompt(opts) {
+    const o = opts || {}, groups = (o.groups || []).slice(0, 40);
+    const ej = { version: 1, modelos: [{ nombre: 'Galaxy S25 Ultra', tipo: 'moviles', grupo: 'HHP' }, { nombre: 'Galaxy Tab S10', tipo: 'tablets' }, { nombre: 'Galaxy Watch 8', tipo: 'relojes', nombre_reporte: 'Watch 8' }], notas: ['«Galaxy Buds» no encaja en ninguna categoría de mi lista: lo he puesto como auriculares.'] };
+    return [
+      'TAREA: convierte la lista de modelos que hay AL FINAL de este mensaje (texto o foto/captura adjunta) en un JSON con el formato de abajo. Es para mi app "Ventas del mes", que lo lee automáticamente.',
+      '',
+      'REGLAS ESTRICTAS',
+      '1. Responde DE UNA VEZ. NO me hagas preguntas. Si algo es ambiguo, elige lo más razonable y apúntalo en "notas" (una frase corta por suposición).',
+      '2. Tu respuesta debe ser SOLO un bloque de código ```json con el JSON. Nada de texto antes ni después.',
+      '3. Usa SOLO los modelos que aparezcan en mi lista o foto. NUNCA añadas modelos de memoria, de otra marca ni del ejemplo.',
+      '4. Una entrada por modelo. Las variantes del mismo modelo (color, memoria, códigos de artículo, precio) se unen en una sola entrada con el nombre corto que usaría un vendedor (p. ej. «Galaxy A56 8/256 GB negro (1234567)» → «Galaxy A56»), salvo que mi lista trate las variantes como productos distintos.',
+      '5. "tipo" es el tipo de producto: "moviles" (teléfonos), "tablets", "relojes" (relojes, pulseras, wearables), "portatiles", "auriculares", "tv", "accesorios". Dedúcelo del producto; si mi lista ya viene agrupada por categorías, respétalas.',
+      '6. "grupo" es opcional: ponlo solo si mi lista asigna ese modelo a una de estas categorías y escríbela EXACTAMENTE como aquí: ' + (groups.length ? groups.map(g => '«' + g + '»').join(', ') : '(no hay ninguna todavía; no pongas "grupo")') + '.',
+      '7. "nombre_reporte" es opcional: el nombre comercial corto con el que quiero que salga el modelo en mi reporte diario, SIN la marca. Si mi lista no lo indica, no lo pongas.',
+      '',
+      'FORMATO DEL JSON',
+      '{ "version": 1,',
+      '  "modelos": [ { "nombre": "Modelo", "tipo": "moviles", "grupo": "(opcional)", "nombre_reporte": "(opcional)" } ],',
+      '  "notas": ["suposiciones o dudas, una frase cada una"] }',
+      '',
+      'EJEMPLO (solo para ver el formato; NO uses estos modelos):',
+      JSON.stringify(ej, null, 1),
+      '',
+      'HOY ES: ' + (o.today || ''),
+      '',
+      'RECUERDA: responde ya, sin preguntas, solo con el bloque ```json.',
+      '',
+      'MI LISTA DE MODELOS (empieza justo debajo de esta línea; si es una foto, está adjunta):',
+      ''
+    ].join('\n');
+  }
+  function normalizeModels(input) {
+    const errors = [], warnings = [];
+    const r = extractJson(input);
+    if (r.error) return { models: [], errors: [r.error], warnings };
+    const raw = r.value || {}, out = new Map();
+    const add = (g, catName, catType) => {
+      const name = String((g && typeof g === 'object' ? pick(g, 'nombre', 'name', 'modelo', 'model') : g) ?? '').trim().slice(0, 80);
+      if (!name) return;
+      const obj = g && typeof g === 'object' ? g : {};
+      const tipo = inferType(pick(obj, 'tipo', 'type')) || catType || '';
+      const grupo = String(pick(obj, 'grupo', 'group', 'categoria', 'categoría') ?? catName ?? '').trim();
+      const alias = String(pick(obj, 'nombre_reporte', 'alias', 'report_name') ?? '').trim().slice(0, 60);
+      const k = norm(name);
+      if (out.has(k)) { warnings.push(`«${name}» aparece repetido; lo cuento una vez.`); return; }
+      out.set(k, { name, tipo, group: grupo, alias: alias && norm(alias) !== k ? alias : '' });
+    };
+    arr(pick(raw, 'modelos', 'models')).slice(0, 300).forEach(g => add(g));
+    arr(pick(raw, 'categorias', 'categorías', 'categories', 'grupos', 'groups')).slice(0, 40).forEach(c => {
+      if (!c || typeof c !== 'object') return;
+      const cn = String(pick(c, 'nombre', 'name') ?? '').trim(), ct = inferType(pick(c, 'tipo', 'type')) || inferType(cn);
+      arr(pick(c, 'modelos', 'models')).slice(0, 300).forEach(m => add(m, cn, ct));
+    });
+    if (!out.size) errors.push('No encuentro ningún modelo en el JSON. Comprueba que tu IA ha devuelto la lista en "modelos".');
+    return { models: [...out.values()], errors, warnings, notes: strs(pick(raw, 'notas', 'notes')).slice(0, 12) };
+  }
+
+  const api = { LEGACY_GROUPS, normalizePlan, extractJson, fromLegacy, evaluate, evaluateAll, describePlan, buildPrompt, matchesScope, groupIdsOf, payFraction, inPeriod, periodText, norm, slug, eur, eur0, fmtV, EXAMPLE_A, EXAMPLE_B, EXAMPLE_C, EXAMPLE_D, EXAMPLE_E, EXAMPLE_F, isoWeek, inferType, buildModelsPrompt, normalizeModels };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   root.Plan = api;
 })(typeof window !== 'undefined' ? window : globalThis);

@@ -280,7 +280,7 @@ function render() {
       }).join('')
     : '<li class="empty">No hay modelos todavía</li>';
   $('models-clear').hidden = !state.models.length;
-  $('models-honor').hidden = state.models.length > 0;
+  if (!state.models.length && !$('models-ai').dataset.touched) $('models-ai').open = true;
 }
 
 function shiftMonth(d) {
@@ -349,9 +349,37 @@ $('model-form').onsubmit = e => {
   state.models.push({ id: uid(), name, gama: $('model-gama').value });
   save(); $('model-name').value = ''; render();
 };
-$('models-honor').onclick = () => {
-  SEED.forEach(([name, gama]) => { if (!state.models.some(m => norm(m.name) === norm(name))) state.models.push({ id: uid(), name, gama, alias: SEED_ALIAS[name] }); });
+// importar modelos con la IA de la persona: instrucciones -> JSON -> modelos
+$('models-ai').addEventListener('toggle', () => { $('models-ai').dataset.touched = '1'; });
+$('mi-copy').onclick = async () => {
+  const text = Plan.buildModelsPrompt({ groups: [...new Set(plansOf(month).flatMap(p => p.groups.map(g => g.name)))], today: todayStr() });
+  try { await navigator.clipboard.writeText(text); $('mi-copy').textContent = '✓ Copiadas: pégalas en tu IA'; $('mi-fallback').hidden = true; }
+  catch (e) { $('mi-fallback').value = text; $('mi-fallback').hidden = false; $('mi-fallback').focus(); $('mi-fallback').select(); $('mi-copy').textContent = 'Selecciona todo y copia ↓'; }
+};
+$('mi-add').onclick = () => {
+  const r = Plan.normalizeModels($('mi-paste').value), list = $('mi-errors'), msg = $('mi-msg');
+  msg.hidden = true;
+  list.className = 'pd-errors';
+  if (r.errors.length) { list.innerHTML = r.errors.map(x => `<li>${esc(x)}</li>`).join(''); list.hidden = false; return; }
+  list.className = 'pd-warnings';
+  const groups = plansOf(month).flatMap(p => p.groups), warn = [...r.warnings];
+  let added = 0, updated = 0;
+  r.models.forEach(x => {
+    let m = state.models.find(k => norm(k.name) === norm(x.name));
+    if (!m) { m = { id: uid(), name: x.name, gama: '' }; state.models.push(m); added++; }
+    else if ((x.tipo && !m.tipo) || (x.alias && !m.alias)) updated++;
+    if (x.tipo && !m.tipo) m.tipo = x.tipo;
+    if (x.alias && !m.alias) m.alias = x.alias;
+    if (x.group) {
+      const g = groups.find(k => Plan.slug(k.id) === Plan.slug(x.group) || Plan.slug(k.name) === Plan.slug(x.group));
+      if (g) assignModelGroup(m, g.id); else warn.push(`«${x.name}»: la categoría «${x.group}» no está en tus objetivos de este mes; la ignoro.`);
+    }
+  });
+  list.innerHTML = warn.map(w => `<li>${esc(w)}</li>`).join(''); list.hidden = !warn.length;
   save(); render();
+  $('mi-paste').value = '';
+  msg.textContent = `✓ ${added} modelo${added === 1 ? '' : 's'} nuevo${added === 1 ? '' : 's'}${updated ? `, ${updated} ya existente${updated === 1 ? '' : 's'} actualizado${updated === 1 ? '' : 's'}` : ''}.` + (r.notes.length ? ' Notas de tu IA: ' + r.notes.join(' ') : '');
+  msg.hidden = false;
 };
 $('models-clear').onclick = () => {
   if (!confirm('¿Vaciar la lista de modelos? Las ventas ya registradas se mantienen. Luego puedes añadir los tuyos o importarlos con tus objetivos.')) return;

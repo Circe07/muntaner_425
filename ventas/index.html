@@ -100,7 +100,16 @@
       <button class="ag-btn ag-btn--primary body">Añadir modelo</button>
     </form>
     <ul id="models" class="models"></ul>
-    <button class="ag-btn ag-btn--glass body" type="button" id="models-honor" hidden>Cargar los modelos de Honor</button>
+    <details class="howto" id="models-ai">
+      <summary>Añadir muchos modelos con tu IA</summary>
+      <p class="hint footnote">1) Copia las instrucciones y pégalas en tu IA (ChatGPT, Gemini, Claude…). 2) Dale tu lista de modelos: una foto del TPV, una captura o el texto, con las categorías si las tienes. 3) Pega aquí lo que te devuelva.</p>
+      <button class="ag-btn ag-btn--glass body" type="button" id="mi-copy">Copiar instrucciones</button>
+      <textarea class="ag-input body" id="mi-fallback" rows="5" readonly hidden aria-label="Instrucciones para copiar"></textarea>
+      <textarea class="ag-input body" id="mi-paste" rows="5" placeholder="Pega aquí la respuesta de tu IA (el JSON)" spellcheck="false"></textarea>
+      <ul class="pd-errors" id="mi-errors" hidden></ul>
+      <button class="ag-btn ag-btn--primary body" type="button" id="mi-add">Añadir estos modelos</button>
+      <p class="hint footnote" id="mi-msg" role="status" hidden></p>
+    </details>
     <button class="ag-btn ag-btn--glass body" type="button" id="models-clear" hidden>Vaciar la lista de modelos</button>
   </section>
 
