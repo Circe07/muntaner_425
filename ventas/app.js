@@ -40,6 +40,14 @@ let month = currentKey();
 // se le da un periodo propio: state.periods['2026-10'] = { from, to }. Cada venta pertenece a UN solo periodo.
 function localToday() { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; }
 function naturalRange(m) { const [y, n] = m.split('-').map(Number); return { from: `${m}-01`, to: `${m}-${String(new Date(y, n, 0).getDate()).padStart(2, '0')}` }; }
+// días que se solapan dos rangos AAAA-MM-DD
+function overlapDays(a, b) {
+  const lo = a.from > b.from ? a.from : b.from, hi = a.to < b.to ? a.to : b.to;
+  if (lo > hi) return 0;
+  return Math.round((new Date(hi + 'T12:00:00') - new Date(lo + 'T12:00:00')) / 864e5) + 1;
+}
+// un periodo propio solo vale si cae sobre su mes (al menos 7 días en común); si no, es un error (p. ej. fechas de agosto en noviembre)
+function periodSane(m, r) { return !!(r && r.from && r.to && r.from <= r.to && overlapDays(naturalRange(m), r) >= 7); }
 function isCustomPeriod(m) { const c = state.periods && state.periods[m]; return !!(c && c.from && c.to); }
 function monthRange(m) { return isCustomPeriod(m) ? state.periods[m] : naturalRange(m); }
 function shiftKey(k, d) { const [y, n] = k.split('-').map(Number); const dt = new Date(y, n - 1 + d, 1); return `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}`; }
@@ -52,7 +60,7 @@ function periodKeyFor(date) {
     if (!(c && c.from && c.to) || (date >= c.from && date <= c.to)) return k;
     k = shiftKey(k, date < c.from ? -1 : 1);
   }
-  return k;
+  return Math.abs((+k.slice(0, 4)) * 12 + (+k.slice(5, 7)) - (+date.slice(0, 4)) * 12 - (+date.slice(5, 7))) > 1 ? date.slice(0, 7) : k;   // nunca más lejos que el mes vecino
 }
 function currentKey() { return periodKeyFor(localToday()); }
 const fmtD = d => `${d.slice(8)}/${d.slice(5, 7)}/${d.slice(0, 4)}`;
@@ -103,6 +111,7 @@ function migrate(s) {
   if (v < 9) s.models.forEach(m => { const a = SEED_ALIAS[m.name]; if (a && !m.alias) m.alias = a; });
   if (v === 9) s.models.forEach(m => { if (m.alias && /^Honor /.test(m.alias)) { const a = m.alias.slice(6).trim(); if (a && a !== m.name) m.alias = a; else delete m.alias; } });
   if (v < 10 && !s.settings.reportPrefix) s.settings.reportPrefix = true;
+  Object.keys(s.periods).forEach(k => { if (!periodSane(k, s.periods[k])) delete s.periods[k]; });   // repara periodos que no caen sobre su mes
   s.seedVersion = 10;
   return s;
 }
@@ -517,6 +526,7 @@ $('pd-go-period').onclick = openPeriodStep;
 $('pd-per-save').onclick = () => {
   const from = $('pd-per-from').value, to = periodEndFromForm();
   if (!(from && to && from <= to)) return;
+  if (!periodSane(month, { from, to })) { alert(`Esas fechas no caen sobre ${monthName(month)}: el periodo tiene que incluir al menos una semana de ese mes.`); return; }
   const nat = naturalRange(month);
   if (from === nat.from && to === nat.to) delete state.periods[month]; else state.periods[month] = { from, to };
   save(); closePlanDialog(); setDefaultDate(); render();
@@ -551,7 +561,7 @@ $('pd-review-btn').onclick = () => {
 
 // paso revisar
 // Un plan con fechas largas (casi un mes) suele ser el periodo del mes entero: se ofrece usarlo como periodo de este mes.
-function periodEligible(plan) { const p = plan.period; return !!(p && p.from && p.to && daysBetween(p.from, p.to) >= 21 && reviewCtx.editIndex === null); }
+function periodEligible(plan) { const p = plan.period; return !!(p && p.from && p.to && daysBetween(p.from, p.to) >= 21 && reviewCtx.editIndex === null && periodSane(month, p)); }
 function syncUsePeriod(plan, initial) {
   const adding = !$('pd-mode').hidden && document.querySelector('input[name=pdmode]:checked') && document.querySelector('input[name=pdmode]:checked').value === 'add';
   const show = periodEligible(plan) && !adding;
@@ -578,6 +588,10 @@ function renderGroups(plan) {
 }
 function startReview(plan, note, warnings, replaceDefault, ctx = {}) {
   draft = plan;
+  if (plan.period && plan.period.from && plan.period.to && overlapDays(monthRange(month), plan.period) < 1) {   // fechas de otro mes: contarían 0 ventas
+    warnings = [...warnings, `El plan trae fechas (del ${fmtD(plan.period.from)} al ${fmtD(plan.period.to)}) que no coinciden con ${monthName(month)}: las ignoro y cuento las ventas de todo el mes. Si no es lo que quieres, cambia de mes arriba y vuelve a pegar.`];
+    plan.period = null;
+  }
   renderGroups(plan);
   reviewCtx = { editIndex: ctx.editIndex ?? null };
   const canMode = plansOf(month).length > 0 && reviewCtx.editIndex === null;
@@ -617,6 +631,7 @@ $('pd-apply').onclick = () => {
   commitPlan(draft, $('pd-models').checked, mode, reviewCtx.editIndex, !$('pd-useperiod-wrap').hidden && $('pd-useperiod').checked);
 };
 function commitPlan(plan, replaceModels, mode, editIndex, usePeriod) {
+  if (usePeriod && plan.period && !periodSane(month, plan.period)) usePeriod = false;
   if (usePeriod && plan.period) {   // las fechas del plan pasan a ser el periodo del mes (y el plan las sigue)
     const nat = naturalRange(month), p = plan.period;
     if (p.from === nat.from && p.to === nat.to) delete state.periods[month]; else state.periods[month] = { from: p.from, to: p.to };
@@ -888,7 +903,7 @@ async function push() {
     : await sb.from('app_state').update(row).eq('user_id', session.user.id).eq('rev', rev).select('rev');
   pushing = false;
   if (r.error || !r.data || !r.data.length) {   // conflicto (otro dispositivo guardó antes) o sin conexión
-    if (r.error && !/duplicate|conflict/i.test(r.error.message)) { setStatus('Sin conexión: los cambios se guardan en este dispositivo', 'off'); return; }
+    if (r.error && !/duplicate|conflict/i.test(r.error.message)) { dirty = true; setStatus('Sin conexión: los cambios se guardan en este dispositivo', 'off'); return; }   // quedan pendientes: no se pisan con la copia de la nube
     await pull(); setStatus('Se actualizó desde otro dispositivo: repite el último cambio si no aparece', 'off'); return;
   }
   rev = r.data[0].rev; setStatus('Sincronizado', 'ok');
@@ -906,7 +921,8 @@ async function initCloud() {
 document.addEventListener('visibilitychange', () => {
   if (!sb || !session) return;
   if (document.hidden) { if (dirty) push(); }
-  else if (!dirty && !pushing && !document.querySelector('dialog[open]')) pull();
+  else if (dirty && !pushing) push();                       // hay cambios sin subir: primero se suben
+  else if (!pushing && !document.querySelector('dialog[open]')) pull();
 });
 $('pw-eye').onclick = () => { const p = $('pw-new'), show = p.type === 'password'; p.type = show ? 'text' : 'password'; $('pw-eye').textContent = show ? 'Ocultar' : 'Ver'; };
 $('pw-form').onsubmit = async e => {
