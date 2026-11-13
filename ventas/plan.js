@@ -41,6 +41,11 @@
     catch (e) { return { error: 'El JSON está incompleto o tiene algún error. Pídele a tu IA: «Devuélveme el JSON completo y válido, solo el bloque de código».' }; }
   }
 
+  // Tipo de producto de un grupo (para repartir las ventas por tipo cuando el texto no trae lista de modelos)
+  const TYPE_RULES = [['tablets', /\b(tablets?|tab\d*|\w*pad\d*|npc)\b/], ['relojes', /\b(wearables?|relojes?|\w*watch\d*|band\d*|pulseras?|iot)\b/], ['portatiles', /\b(portatiles?|laptops?|notebook|ordenadores?|\w*book\d*)\b/],
+    ['auriculares', /\b(auriculares?|\w*buds\d*|tws|earbuds|headphones?)\b/], ['tv', /\b(tv|televisor(es)?|television(es)?)\b/], ['accesorios', /\b(accesorios?|cargadores?|fundas?)\b/],
+    ['moviles', /\b(moviles?|smartphones?|telefon\w*|phones?|hhp|handhelds?)\b/]];
+  const inferType = text => { const n = norm(text); if (!n) return ''; for (const [k, re] of TYPE_RULES) if (re.test(n)) return k; return ''; };
   function normalizePlan(input) {
     const errors = [], warnings = [];
     let raw = input;
@@ -75,7 +80,8 @@
       while (groups.some(x => x.id === id)) id += '-' + (i + 1);
       const seen = new Map();
       strs(pick(g, 'modelos', 'models')).slice(0, 300).forEach(m => { if (!seen.has(norm(m))) seen.set(norm(m), m); });
-      groups.push({ id, name, models: [...seen.values()] });
+      const type = inferType(pick(g, 'tipo', 'type')) || (seen.size ? '' : inferType(name));
+      groups.push({ id, name, models: [...seen.values()], type });
       gRef.set(id, id); gRef.set(slug(name), id);
     });
 
@@ -239,7 +245,9 @@
     const n = norm(sale.name), gs = plan.groups || [];
     const named = gs.filter(g => (g.models || []).some(m => norm(m) === n));
     if (named.length) return named.map(g => g.id);
-    return gs.filter(g => norm(g.id) === norm(sale.gama)).map(g => g.id);
+    const byGama = gs.filter(g => norm(g.id) === norm(sale.gama)).map(g => g.id);
+    if (byGama.length) return byGama;
+    return sale.tipo ? gs.filter(g => g.type && g.type === sale.tipo).map(g => g.id) : [];   // sin lista de modelos: por tipo de producto
   }
   function matchesScope(plan, scope, sale) {
     if (!scope || scope.all) return true;
@@ -366,7 +374,7 @@
       const p = o.payout;
       const meta = o.metric === 'revenue' ? `vender ${eur0(o.target)}` : `vender ${fmtV('units', o.target)} uds.`;
       let pay;
-      if (!(p.reward > 0)) pay = 'Es una meta de referencia: no paga por sí sola, sirve para calcular otros premios.';
+      if (!(p.reward > 0)) pay = 'Es una meta de seguimiento: no tiene pago asociado (si otros premios dependen de ella, se aplican en su apartado).';
       else if (p.curve === 'flat') pay = `Cobras ${eur(p.reward)} en cuanto llegas al ${p.start_pct}% de la meta.`;
       else if (p.curve === 'steps') pay = `Escalones sobre ${eur(p.reward)}: ` + p.steps.map(s => `desde el ${s.from}% cobras el ${s.pays}%`).join('; ') + '.';
       else pay = `Desde el ${p.start_pct}% de la meta cobras tu porcentaje de ${eur(p.reward)} (al 100%: ${eur(p.reward)}${p.cap_pct > 100 ? `; sigue hasta el ${p.cap_pct}%: ${eur(p.reward * p.cap_pct / 100)}` : ''}); por debajo del ${p.start_pct}%, nada.`;
@@ -444,6 +452,33 @@
     notas: ['El texto no indica la categoría de «Pad Z2»: lo puse en Tablets por el nombre.', 'Los modelos de cada categoría son solo los que cita el texto.']
   };
 
+  const EXAMPLE_F = {
+    version: 1, marca: 'Ejemplo F (metas en dinero por categoría y unidades por semana, sin esquema de pago)', nombre: 'Target del mes (semanas W45–W48)', periodo: { desde: '2026-11-02', hasta: '2026-11-29' },
+    grupos: [{ id: 'hhp', nombre: 'HHP (móviles)', tipo: 'moviles', modelos: [] }, { id: 'tab', nombre: 'Tab', tipo: 'tablets', modelos: [] }, { id: 'wearables', nombre: 'Wearables', tipo: 'relojes', modelos: [] }],
+    objetivos: [
+      { id: 'hhp', nombre: 'Importe HHP', metrica: 'importe', ambito: { grupos: ['hhp'] }, meta: 338113.08 },
+      { id: 'tab', nombre: 'Importe Tab', metrica: 'importe', ambito: { grupos: ['tab'] }, meta: 52970.4 },
+      { id: 'wearables', nombre: 'Importe Wearables', metrica: 'importe', ambito: { grupos: ['wearables'] }, meta: 32138.1 },
+      { id: 'w45', nombre: 'Semana 45', metrica: 'unidades', ambito: { todo: true }, meta: 58, periodo: { desde: '2026-11-02', hasta: '2026-11-08' } },
+      { id: 'w46', nombre: 'Semana 46', metrica: 'unidades', ambito: { todo: true }, meta: 60, periodo: { desde: '2026-11-09', hasta: '2026-11-15' } },
+      { id: 'mes', nombre: 'Total mes (unidades)', metrica: 'unidades', ambito: { todo: true }, meta: 416 }
+    ],
+    notas: ['El texto da las metas pero no cuánto se cobra («el esquema de pago está en tu mail»): las dejo como metas de seguimiento, sin pago.', 'Importes en $ en el texto: los pongo como número sin convertir moneda.', 'Condiciones como asistencia, uniforme o mystery shopper no se calculan en la app.']
+  };
+  // semanas ISO del año (lunes a domingo): la W1 es la que contiene el 4 de enero
+  const isoDate = d => `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}-${String(d.getUTCDate()).padStart(2, '0')}`;
+  function isoWeek(year, n) {
+    const j4 = new Date(Date.UTC(year, 0, 4)), dow = (j4.getUTCDay() + 6) % 7;
+    const mon = new Date(j4.getTime() + ((n - 1) * 7 - dow) * 864e5), sun = new Date(mon.getTime() + 6 * 864e5);
+    return { from: isoDate(mon), to: isoDate(sun) };
+  }
+  function weekTable(today) {
+    const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(today || ''), now = m ? new Date(Date.UTC(+m[1], +m[2] - 1, +m[3])) : new Date();
+    const yr = now.getUTCFullYear(), w1 = isoWeek(yr, 1);
+    const cur = Math.max(1, Math.floor((now - new Date(w1.from + 'T00:00:00Z')) / (7 * 864e5)) + 1);
+    const rows = []; for (let n = Math.max(1, cur - 6); n <= Math.min(53, cur + 8); n++) { const w = isoWeek(yr, n); rows.push(`W${n} = ${w.from} a ${w.to}`); }
+    return `SEMANAS ISO DE ${yr} (lunes a domingo; W1 empieza el ${w1.from}, cada semana siguiente suma 7 días). Úsalas si el texto habla de W/S/semana + número:\n` + rows.join('; ');
+  }
   function buildPrompt(opts) {
     const o = opts || {};
     const models = (o.models || []).slice(0, 80);
@@ -454,18 +489,19 @@
       'REGLAS ESTRICTAS (léelas antes de empezar)',
       '1. Responde DE UNA VEZ. NO me hagas preguntas, ni una. Si algo es ambiguo o falta un dato, elige la interpretación más razonable y apúntala en el campo "notas" (una frase corta por cada suposición).',
       '2. Tu respuesta debe ser SOLO un único bloque de código ```json con el JSON. Nada de texto antes ni después, ni explicaciones, ni saludos.',
-      '3. No inventes cifras. Usa solo números que aparezcan en el texto. Si la meta de un objetivo no aparece (suele ser personal), pon "meta": 0 y anótalo en "notas": el usuario la pondrá en la app.',
+      '3. No inventes cifras. Usa solo números que aparezcan en el texto. Si la meta de un objetivo no aparece (suele ser personal), pon "meta": 0 y anótalo en "notas": el usuario la pondrá en la app. Si el texto da las metas pero NO cuánto se cobra (p. ej. «el esquema de pago lo tienes en tu mail»), escribe los objetivos SIN "pago" (son metas de seguimiento) y anótalo en "notas"; no inventes premios.',
       '4. Si el texto mezcla varias marcas, meses o programas, usa solo lo que corresponda al mes indicado abajo y a un comercial de tienda. Ignora lo demás (condiciones legales, saludos…). Lo que dependa de otros departamentos o que no se pueda calcular (p. ej. «estrellas», asistencia) no lo incluyas: anótalo en "notas".',
       '5. Números sin símbolo ni separador de miles (40000, no "40.000 €"). Porcentajes sin el símbolo %.',
-      '6. PERIODO: si el texto indica en qué fechas cuentan los objetivos (p. ej. «del 6 de octubre al 2 de noviembre», «mes de 5 semanas», «cierra el día 3», una semana, una quincena, una campaña), pon "periodo" con fechas AAAA-MM-DD; la app solo contará las ventas de esas fechas. Deduce el año con el MES y la fecha de hoy que te doy abajo. Si pone «esta semana», resuélvela con esa fecha (semana = lunes a domingo). Si el texto NO indica periodo, NO pongas "periodo": se usará el mes natural (del día 1 al último).',
-      '7. MODELOS Y CATEGORÍAS: saca los modelos DEL TEXTO. Usa SOLO modelos que aparezcan en el texto: NUNCA añadas modelos de memoria, de otra marca ni de ningún ejemplo de este mensaje. Si hay objetivos por categoría (móviles, tablets, relojes o wearables, portátiles, auriculares, TV, accesorios…), crea un grupo por cada categoría y coloca en su "modelos" TODOS los modelos que cite el texto, cada uno en la categoría que le corresponda según el tipo de producto (usa lo que sepas del producto: «Pad/Tab» = tablet, «Watch/Band/Fit» = reloj o pulsera, «Book/Laptop» = portátil, «Buds/TWS» = auriculares, un teléfono = móvil…). Si el texto ya trae una tabla modelo → categoría, respétala tal cual. Si no sabes a qué categoría pertenece un modelo, déjalo fuera de los grupos y apúntalo en "notas".',
+      '6. PERIODO: si el texto indica en qué fechas cuentan los objetivos (p. ej. «del 6 de octubre al 2 de noviembre», «mes de 5 semanas», «cierra el día 3», una semana, una quincena, una campaña), pon "periodo" con fechas AAAA-MM-DD; la app solo contará las ventas de esas fechas. Deduce el año con el MES y la fecha de hoy que te doy abajo. Si pone «esta semana», resuélvela con esa fecha (semana = lunes a domingo). Si el texto NO indica periodo, NO pongas "periodo": se usará el mes natural (del día 1 al último). SEMANAS: si las metas vienen por semana («W45», «S45», «semana 46»…), son semanas ISO (lunes a domingo): usa la tabla de semanas que te doy más abajo y haz UN objetivo por semana con su "periodo" (desde el lunes hasta el domingo). Si el texto define el mes como esas semanas (p. ej. W45–W48 y «Total mes»), pon además el "periodo" del plan desde el lunes de la primera semana hasta el domingo de la última, y el objetivo del total del mes sin periodo propio.',
+      '7. MODELOS Y CATEGORÍAS: saca los modelos DEL TEXTO. Usa SOLO modelos que aparezcan en el texto: NUNCA añadas modelos de memoria, de otra marca ni de ningún ejemplo de este mensaje. Si hay objetivos por categoría (móviles, tablets, relojes o wearables, portátiles, auriculares, TV, accesorios…), crea un grupo por cada categoría y coloca en su "modelos" TODOS los modelos que cite el texto, cada uno en la categoría que le corresponda según el tipo de producto (usa lo que sepas del producto: «Pad/Tab» = tablet, «Watch/Band/Fit» = reloj o pulsera, «Book/Laptop» = portátil, «Buds/TWS» = auriculares, un teléfono = móvil…). Si el texto ya trae una tabla modelo → categoría, respétala tal cual. Si no sabes a qué categoría pertenece un modelo, déjalo fuera de los grupos y apúntalo en "notas". Si el texto NO lista modelos (solo da metas por categoría, p. ej. «HHP», «Tab», «Wearables»), crea igualmente el grupo con "modelos": [] y su "tipo": la app repartirá las ventas por tipo de producto sola. Traduce siglas: HHP = teléfonos móviles ("moviles"), Tab/Tablets = "tablets", Wearables/IoT = "relojes".',
+      '8. DINERO: las cantidades en dinero van solo como número aunque el texto use $, £ o €; no conviertas moneda. Si el texto no usa € anótalo en "notas" (la app muestra €).',
       '',
       'FORMATO DEL JSON (todos los campos salvo "objetivos" o "incentivos_por_unidad" son opcionales)',
       '{',
       '  "version": 1,',
       '  "marca": "texto", "nombre": "nombre corto del plan, p. ej. Semana 9-15 nov",',
       '  "periodo": { "desde": "2026-11-09", "hasta": "2026-11-15" },',
-      '  "grupos": [ { "id": "alta", "nombre": "Gama Alta", "modelos": ["nombre exacto del modelo", "..."] } ],',
+      '  "grupos": [ { "id": "alta", "nombre": "Gama Alta", "tipo": "moviles" | "tablets" | "relojes" | "portatiles" | "auriculares" | "tv" | "accesorios" (opcional), "modelos": ["nombre exacto del modelo", "..."] } ],',
       '  "objetivos": [ {',
       '    "id": "alta", "nombre": "Gama Alta",',
       '    "metrica": "unidades" | "importe",',
@@ -488,7 +524,7 @@
       'CÓMO DECIDIR CADA CAMPO',
       '- metrica: "unidades" si la meta es un número de aparatos (sell-out en unidades); "importe" si la meta es dinero vendido (€, sell-out en valor, facturación).',
       '- ambito: qué ventas cuentan. Una categoría o gama → { "grupos": [id] }; modelos concretos → { "modelos": [...] }; todo lo vendido → { "todo": true }.',
-      '- grupos: las categorías o gamas del texto (alta/media/entrada, móviles/wearables/tablets…). En "modelos" pon los nombres exactos que cite el texto. Si no hay lista, deja "modelos": [].',
+      '- grupos: las categorías o gamas del texto (alta/media/entrada, móviles/wearables/tablets…). En "modelos" pon los nombres exactos que cite el texto. Si no hay lista, deja "modelos": [] y pon "tipo" cuando la categoría sea un tipo de producto.',
       '- meta: el número a alcanzar (unidades o euros). Una meta que solo sirve para calcular otros premios se escribe como objetivo SIN "pago".',
       '- pago.recompensa: los € que se cobran al llegar al 100% de la meta (o el premio total si es todo-o-nada).',
       '- pago.desde_pct: % mínimo de la meta para empezar a cobrar ("a partir del 80%"). Si no se dice: 80 en lineal y escalones; 100 en fijo.',
@@ -519,6 +555,10 @@
       'EJEMPLO E (una marca con objetivos separados por categoría: cada modelo del texto va en su categoría):',
       J(EXAMPLE_E),
       '',
+      'EJEMPLO F (metas por categoría sin lista de modelos, metas semanales y sin esquema de pago):',
+      J(EXAMPLE_F),
+      '',
+      weekTable(o.today),
       'MES: ' + (o.monthLabel || ''),
       'HOY ES: ' + (o.today || ''),
       models.length
@@ -532,7 +572,7 @@
     ].join('\n');
   }
 
-  const api = { LEGACY_GROUPS, normalizePlan, extractJson, fromLegacy, evaluate, evaluateAll, describePlan, buildPrompt, matchesScope, groupIdsOf, payFraction, inPeriod, periodText, norm, slug, eur, eur0, fmtV, EXAMPLE_A, EXAMPLE_B, EXAMPLE_C, EXAMPLE_D, EXAMPLE_E };
+  const api = { LEGACY_GROUPS, normalizePlan, extractJson, fromLegacy, evaluate, evaluateAll, describePlan, buildPrompt, matchesScope, groupIdsOf, payFraction, inPeriod, periodText, norm, slug, eur, eur0, fmtV, EXAMPLE_A, EXAMPLE_B, EXAMPLE_C, EXAMPLE_D, EXAMPLE_E, EXAMPLE_F, isoWeek, inferType };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   root.Plan = api;
 })(typeof window !== 'undefined' ? window : globalThis);

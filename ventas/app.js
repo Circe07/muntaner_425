@@ -124,7 +124,10 @@ function plansOf(m) {
   return [];
 }
 const hasGoals = m => plansOf(m).length > 0;
-const evalMonth = (m, sales) => Plan.evaluateAll(plansOf(m), sales, state.sales);
+// tipo de producto de la venta (para los grupos que no traen lista de modelos): el elegido a mano en el modelo o el que sale del nombre
+const saleKind = s => { const m = state.models.find(x => norm(x.name) === norm(s.name)); return Report.deviceType(s.name, '', m && m.tipo); };
+const withKind = s => ({ ...s, tipo: saleKind(s) });
+const evalMonth = (m, sales) => Plan.evaluateAll(plansOf(m), sales.map(withKind), state.sales.map(withKind));
 // último mes anterior con un plan mensual (sin fechas propias) que se pueda repetir
 function previousPlan(m) {
   for (const k of monthKeys().filter(x => x < m).reverse()) { const p = plansOf(k).find(x => !x.period); if (p) return { month: k, plan: p }; }
@@ -138,7 +141,7 @@ function currentGroups() {
 function groupOfName(name, gama) {
   const gs = currentGroups();
   let id = null;
-  for (const p of plansOf(month)) { id = Plan.groupIdsOf(p, { name, gama })[0]; if (id) break; }
+  for (const p of plansOf(month)) { id = Plan.groupIdsOf(p, { name, gama, tipo: saleKind({ name }) })[0]; if (id) break; }
   id = id || gama;
   const g = gs.find(x => x.id === id);
   return g ? { name: g.name, i: gs.indexOf(g) } : { name: LABEL[gama] || gama || '', i: 0 };
@@ -178,7 +181,7 @@ function objectiveCard(o, ev, idx) {
       <div class="big">${f(o.value)} <small>/ ${f(o.target)}${unit}</small></div>
       <div class="bar"><i style="width:${fill}%"></i>${markHtml}</div>
       <div class="miss">${miss}</div>
-      ${p.reward > 0 ? `<div class="inc">Incentivo ahora: <strong>${eur(o.payNow)}</strong><br>${detail}</div>` : `<div class="note">${o.target ? 'Meta de referencia: sirve para calcular otros premios.' : '⚠ Falta tu meta: pónla en «Ajustar».'}</div>`}
+      ${p.reward > 0 ? `<div class="inc">Incentivo ahora: <strong>${eur(o.payNow)}</strong><br>${detail}</div>` : `<div class="note">${o.target ? 'Meta de seguimiento (sin pago asociado).' : '⚠ Falta tu meta: pónla en «Ajustar».'}</div>`}
       ${notes}
     </div>`;
 }
@@ -660,7 +663,7 @@ setDefaultDate(); render();
 function typeOfSale(s, ym) {
   const model = state.models.find(m => norm(m.name) === norm(s.name));
   let gname = '';
-  for (const p of plansOf(ym)) { const id = Plan.groupIdsOf(p, s)[0]; const g = id && p.groups.find(x => x.id === id); if (g) { gname = g.name; break; } }
+  for (const p of plansOf(ym)) { const id = Plan.groupIdsOf(p, withKind(s))[0]; const g = id && p.groups.find(x => x.id === id); if (g) { gname = g.name; break; } }
   return Report.deviceType(s.name, gname, model && model.tipo);
 }
 const reportName = m => (m && m.alias) || '';

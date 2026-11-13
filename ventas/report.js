@@ -25,7 +25,7 @@
     ['auriculares', /\b(\w*buds\d*|tws|airpods|auriculares?|earbuds|headphones?)\b/],
     ['tv', /\b(tv|televisor|televisores|television|televisiones)\b/],
     ['accesorios', /\b(charger|cargador|cargadores|cable|cables|funda|fundas|cover|adaptador|powerbank|accesorio|accesorios)\b/],
-    ['moviles', /\b(movil|moviles|smartphone|smartphones|telefono|telefonos|phone|phones)\b/]
+    ['moviles', /\b(movil|moviles|smartphone|smartphones|telefono|telefonos|phone|phones|hhp|handheld)\b/]
   ];
   const typeFromText = text => { const n = norm(text); if (!n) return null; for (const [k, re] of RULES) if (re.test(n)) return k; return null; };
 
