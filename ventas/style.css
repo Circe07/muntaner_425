@@ -25,6 +25,11 @@ label{display:flex;flex-direction:column;gap:var(--space-1);font-size:13px;color
 label .ag-input{color:var(--ink)}
 #sale-qty{width:100px}
 #sale-lines{display:grid;gap:var(--space-3);flex:1 1 100%}.sale-line{display:flex;flex-wrap:wrap;gap:var(--space-3);align-items:flex-end}.sale-line+.sale-line{border-top:1px solid var(--glass-edge);padding-top:var(--space-3)}.sale-line>*{flex:1 1 100%}.sale-line [hidden],#sale-grand[hidden]{display:none}.sl-remove{align-self:flex-start;flex:none!important}
+.chips{display:flex;flex-wrap:wrap;gap:var(--space-2)}.sl-class-wrap{display:grid;gap:var(--space-1)}#models-filter-wrap{margin:var(--space-2) 0 var(--space-3)}
+.cls-chip{display:inline-flex;align-items:center;gap:6px;min-height:36px;padding:0 14px;border-radius:999px;border:1px solid var(--glass-edge);background:var(--surface);color:var(--ink);font:inherit;font-size:14px;font-weight:600;cursor:pointer;-webkit-tap-highlight-color:transparent}
+.cls-n{font-size:13px;font-weight:600;opacity:.6}
+.cls-chip[aria-pressed=true]{background:var(--accent);border-color:var(--accent);color:#fff}.cls-chip[aria-pressed=true] .cls-n{opacity:.85}
+.cls-chip:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 select.ag-input{padding-right:var(--space-2)}
 .hint{color:var(--ink-secondary);margin:var(--space-2) 0 0}
 .empty{color:var(--ink-secondary)}

@@ -153,26 +153,30 @@ function classIdOf(m) {
   id = id || m.gama;
   return currentGroups().some(x => x.id === id) ? id : '';
 }
-// opciones del selector de clase, con cuántos modelos tiene cada una
-function classOptionsHtml(selected) {
+// nombre corto de la clase: sin la aclaración entre paréntesis («HHP (móviles)» → «HHP»)
+const shortName = n => String(n || '').replace(/\s*\([^)]*\)\s*$/, '').trim() || String(n || '');
+// botones (chips) de clase, con cuántos modelos tiene cada una; devuelve el html y qué valores son válidos
+function classChips(selected) {
   const gs = currentGroups(), cnt = new Map();
   state.models.forEach(m => { const k = classIdOf(m); cnt.set(k, (cnt.get(k) || 0) + 1); });
-  const o = (v, label) => `<option value="${esc(v)}"${v === selected ? ' selected' : ''}>${esc(label)}</option>`;
-  return o('', `Todas las clases (${state.models.length})`) + gs.filter(g => cnt.get(g.id)).map(g => o(g.id, `${g.name} (${cnt.get(g.id)})`)).join('') + (cnt.get('') ? o('__none', `Sin clase (${cnt.get('')})`) : '');
+  const items = [['', 'Todas', state.models.length], ...gs.filter(g => cnt.get(g.id)).map(g => [g.id, shortName(g.name), cnt.get(g.id)])];
+  if (cnt.get('')) items.push(['__none', 'Sin clase', cnt.get('')]);
+  const value = items.some(x => x[0] === selected) ? selected : '';
+  return { value, html: items.map(([v, label, n]) => `<button type="button" class="cls-chip" data-cls="${esc(v)}" aria-pressed="${v === value}">${esc(label)}:<span class="cls-n">${n}</span></button>`).join('') };
 }
 const inClass = (m, cls) => !cls || (cls === '__none' ? classIdOf(m) === '' : classIdOf(m) === cls);
-// rellena una fila de la venta: selector de clase y modelos de esa clase
+// rellena una fila de la venta: botones de clase y modelos de esa clase (con la clase elegida, el modelo va sin etiqueta)
 function fillRow(row) {
   const cs = row.querySelector('.sl-class'), sel = row.querySelector('.sl-model'), picked = sel.value;
-  cs.innerHTML = classOptionsHtml(cs.value);
+  const ch = classChips(row.dataset.cls || ''); row.dataset.cls = ch.value; cs.innerHTML = ch.html;
   row.querySelector('.sl-class-wrap').hidden = currentGroups().length < 2 || state.models.length < 2;
-  const list = state.models.filter(m => inClass(m, cs.value));
-  sel.innerHTML = '<option value="" selected disabled>' + (list.length ? 'Elige un modelo…' : 'No hay modelos en esta clase') + '</option>' + list.map(m => { const g = groupOfName(m.name, m.gama).name; return `<option value="${m.id}">${esc(m.name)}${g ? ` (${esc(g)})` : ''}</option>`; }).join('');
+  const list = state.models.filter(m => inClass(m, ch.value));
+  sel.innerHTML = '<option value="" selected disabled>' + (list.length ? 'Elige un modelo…' : 'No hay modelos en esta clase') + '</option>' + list.map(m => { const g = ch.value ? '' : shortName(groupOfName(m.name, m.gama).name); return `<option value="${m.id}">${esc(m.name)}${g ? ` · ${esc(g)}` : ''}</option>`; }).join('');
   if (list.some(m => m.id === picked)) sel.value = picked;
 }
 function tagHtml(name, gama) {
   const g = groupOfName(name, gama);
-  return g.name ? `<span class="tag" style="background:var(--g${g.i % 8})">${esc(g.name)}</span>` : '';
+  return g.name ? `<span class="tag" style="background:var(--g${g.i % 8})">${esc(shortName(g.name))}</span>` : '';
 }
 const MESES = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
 const MES3 = ['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
@@ -293,10 +297,10 @@ function render() {
   const gOpts = sel => gs.map(g => `<option value="${esc(g.id)}"${g.id === sel ? ' selected' : ''}>${esc(g.name)}</option>`).join('') + `<option value=""${sel === '' ? ' selected' : ''}>Sin grupo</option>`;
   const prevGroup = $('model-gama').value;
   $('model-gama').innerHTML = gOpts(gs.some(g => g.id === prevGroup) || prevGroup === '' ? prevGroup : gs[0].id);
-  const mf = $('models-filter');
-  mf.innerHTML = classOptionsHtml(mf.value); if (![...mf.options].some(x => x.value === mf.value)) mf.value = '';
+  const mf = $('models-filter'), mch = classChips(mf.dataset.cls || '');
+  mf.dataset.cls = mch.value; mf.innerHTML = mch.html;
   $('models-filter-wrap').hidden = gs.length < 2 || state.models.length < 6;
-  const shown = state.models.filter(m => inClass(m, $('models-filter-wrap').hidden ? '' : mf.value));
+  const shown = state.models.filter(m => inClass(m, $('models-filter-wrap').hidden ? '' : mch.value));
   $('models').innerHTML = shown.length
     ? shown.map(m => {
         const extra = (!m.gama || gs.some(g => g.id === m.gama)) ? '' : `<option value="${esc(m.gama)}" selected>${esc(LABEL[m.gama] || m.gama)}</option>`;
@@ -374,12 +378,13 @@ saleLines.addEventListener('click', e => {
   else if (e.target.closest('.sl-remove')) { row.remove(); updateSaleForm(); }
 });
 saleLines.addEventListener('input', updateSaleForm);
-saleLines.addEventListener('change', e => { const row = e.target.closest('.sale-line'); if (row && e.target.classList.contains('sl-class')) fillRow(row); updateSaleForm(); });
-$('models-filter').onchange = () => render();
+saleLines.addEventListener('change', updateSaleForm);
+saleLines.addEventListener('click', e => { const chip = e.target.closest('.cls-chip'), row = e.target.closest('.sale-line'); if (!chip || !row) return; row.dataset.cls = chip.dataset.cls; fillRow(row); updateSaleForm(); });
+$('models-filter').addEventListener('click', e => { const chip = e.target.closest('.cls-chip'); if (!chip) return; $('models-filter').dataset.cls = chip.dataset.cls; render(); });
 function addLine() {
   const first = lineRows()[0], row = first.cloneNode(true);
   row.querySelectorAll('[id]').forEach(el => el.removeAttribute('id'));
-  row.querySelector('.sl-class').value = ''; fillRow(row); row.querySelector('.sl-model').value = ''; row.querySelector('.sl-qty').value = 0; row.querySelector('.sl-amount').value = ''; row.querySelector('.sl-total').hidden = true;
+  row.dataset.cls = ''; fillRow(row); row.querySelector('.sl-model').value = ''; row.querySelector('.sl-qty').value = 0; row.querySelector('.sl-amount').value = ''; row.querySelector('.sl-total').hidden = true;
   const rm = document.createElement('button'); rm.type = 'button'; rm.className = 'ag-btn ag-btn--glass body sl-remove'; rm.textContent = '✕ Quitar este modelo'; row.appendChild(rm);
   saleLines.appendChild(row); row.querySelector('.sl-model').focus(); updateSaleForm();
 }
