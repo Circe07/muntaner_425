@@ -9,7 +9,8 @@ body{margin:0;min-height:100vh;color:var(--ink);font-family:var(--font-sans);fon
     var(--canvas);
   background-attachment:fixed}
 h1,h2,h3{margin:0}
-.topbar{position:sticky;top:0;z-index:5;gap:var(--space-3);padding:0 var(--space-4);flex-wrap:nowrap}
+.top-sticky{position:sticky;top:0;z-index:5}
+.topbar{position:relative;gap:var(--space-3);padding:0 var(--space-4);flex-wrap:nowrap}
 .topbar h1{flex:0 1 auto;text-align:left}
 .month{display:flex;align-items:center;gap:var(--space-1)}
 .month .ag-input{width:auto;height:40px}
@@ -108,7 +109,7 @@ dialog{max-width:560px;max-height:92vh;overflow:auto}
 #logout{margin-left:var(--space-2)}
 
 /* ---- Ajuste móvil: nada debe ensanchar la página ---- */
-html,body{max-width:100%;overflow-x:hidden}
+html,body{max-width:100%}html{overflow-x:hidden}body{overflow-x:hidden;overflow-x:clip}   /* clip no crea un contenedor de scroll: así la cabecera sticky sí se queda fija */
 main{grid-template-columns:minmax(0,1fr)}
 .card{min-width:0}
 .two{grid-template-columns:repeat(2,minmax(0,1fr))}
@@ -290,3 +291,6 @@ dialog{max-height:92vh;max-height:calc(100dvh - 24px);overscroll-behavior:contai
 .no-models{display:grid;gap:var(--space-3)}.no-models[hidden]{display:none}.no-models p{margin:0}
 .ta-clear{margin-top:var(--space-2);min-height:36px;padding:0 var(--space-4);width:auto;align-self:flex-start}.ta-clear[hidden]{display:none}
 @keyframes flash-card{0%{box-shadow:0 0 0 3px var(--accent)}100%{box-shadow:0 0 0 0 transparent}}.flash{animation:flash-card 1.6s ease-out}
+
+.net-banner{display:flex;align-items:center;justify-content:center;gap:8px;padding:3px var(--space-3);font-size:12px;line-height:1.25;text-align:center;color:var(--ink);background:color-mix(in srgb,var(--danger) 16%,var(--canvas-raised));border-bottom:1px solid color-mix(in srgb,var(--danger) 40%,transparent)}
+.net-banner[hidden]{display:none}.net-dot{width:7px;height:7px;border-radius:50%;background:var(--danger);flex:none}

@@ -19,6 +19,7 @@
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
+<div class="top-sticky">
 <header class="ag-navbar topbar">
   <h1 class="headline">Ventas del mes</h1><span id="sync-dot" class="sync-dot" role="status" aria-label="Estado de sincronización"></span>
   <div class="month">
@@ -27,6 +28,8 @@
     <button class="ag-navbar__action" id="next" aria-label="Mes siguiente">›</button>
   </div>
 </header>
+<div id="net-banner" class="net-banner" role="status" aria-live="polite" hidden><span class="net-dot" aria-hidden="true"></span>Estás sin internet. Cuando te vuelvas a conectar se cargarán los datos.</div>
+</div>
 
 <main>
   <section class="card ag-card ag-grain" id="add-sale">

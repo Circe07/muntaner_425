@@ -879,8 +879,16 @@ $('rp-wa').addEventListener('click', e => { if ($('rp-wa').getAttribute('aria-di
 
 // ---------- Cuenta y sincronización (Supabase) ----------
 const CFG = window.SUPABASE_CONFIG;
-let sb = null, session = null, rev = 0, pushTimer = null, pushing = false, dirty = false;
-function setStatus(text, s = '') { $('sync').textContent = text; $('sync-dot').dataset.s = s; $('sync-dot').title = text; }
+let sb = null, session = null, pushTimer = null, pushing = false, dirty = false;
+const REVKEY = KEY + '-rev';
+let rev = 0; try { rev = parseInt(localStorage.getItem(REVKEY), 10) || 0; } catch (e) {}        // la versión de la nube se recuerda: así lo que se edita sin internet se puede subir luego
+const saveRev = () => { try { localStorage.setItem(REVKEY, String(rev)); } catch (e) {} };
+let lastStatus = ['', ''], netOnline = navigator.onLine, netKnown = false;
+function setStatus(text, s = '') {
+  lastStatus = [text, s];
+  if (!netOnline) { text = 'Sin internet: los cambios se guardan en este dispositivo'; s = 'off'; }   // sin internet manda el rojo, pase lo que pase con la nube
+  $('sync').textContent = text; $('sync-dot').dataset.s = s; $('sync-dot').title = text;
+}
 const traducir = m => /invalid login/i.test(m) ? 'Correo o contraseña incorrectos. Si ya creaste la cuenta, usa los mismos datos de siempre (pulsa “Ver” para comprobar la contraseña).'
   : /not confirmed/i.test(m) ? 'Falta confirmar el correo: abre el enlace que te hemos enviado.'
   : /already registered|registro cerrado|database error/i.test(m) ? 'Ya existe una cuenta con ese correo. Pulsa “Entrar” con tu correo y contraseña de siempre.'
@@ -910,8 +918,8 @@ async function pull() {
   setStatus('Sincronizando…');
   const { data, error } = await sb.from('app_state').select('data,rev').maybeSingle();
   if (error) { setStatus('Sin conexión: los cambios se guardan en este dispositivo', 'off'); return false; }
-  if (data) { state = migrate(data.data); rev = data.rev; persistLocal(); setStatus('Sincronizado', 'ok'); render(); return true; }
-  rev = 0; await push(); return true;   // primera vez: sube lo que hay en este dispositivo
+  if (data) { state = migrate(data.data); rev = data.rev; saveRev(); persistLocal(); setStatus('Sincronizado', 'ok'); render(); return true; }
+  rev = 0; saveRev(); await push(); return true;   // primera vez: sube lo que hay en este dispositivo
 }
 function schedulePush() { if (!sb || !session) return; dirty = true; setStatus('Guardando…', 'busy'); clearTimeout(pushTimer); pushTimer = setTimeout(push, 700); }
 async function push() {
@@ -925,7 +933,7 @@ async function push() {
     if (r.error && !/duplicate|conflict/i.test(r.error.message)) { dirty = true; setStatus('Sin conexión: los cambios se guardan en este dispositivo', 'off'); return; }   // quedan pendientes: no se pisan con la copia de la nube
     await pull(); setStatus('Se actualizó desde otro dispositivo: repite el último cambio si no aparece', 'off'); return;
   }
-  rev = r.data[0].rev; setStatus('Sincronizado', 'ok');
+  rev = r.data[0].rev; saveRev(); setStatus('Sincronizado', 'ok');
   if (dirty) schedulePush();
 }
 async function initCloud() {
@@ -958,8 +966,45 @@ $('pw-form').onsubmit = async e => {
 };
 $('logout').onclick = async () => {
   if (!sb || !confirm('¿Cerrar sesión en este dispositivo?')) return;
-  await sb.auth.signOut(); try { localStorage.removeItem(KEY); } catch (e) {} location.reload();
+  await sb.auth.signOut(); try { localStorage.removeItem(KEY); localStorage.removeItem(REVKEY); } catch (e) {} location.reload();
 };
+
+// ---------- conexión a internet: se comprueba cada pocos segundos y al instante cuando el móvil avisa ----------
+// navigator.onLine solo dice si hay red (wifi), no si hay internet: por eso además se hace una petición real a un servidor externo.
+let netTimer = null, netChecking = false;
+const NET_MS = () => window.__NET_MS || (netOnline ? 10000 : 4000);      // conectado: cada 10 s; sin internet: cada 4 s para recuperarse enseguida
+async function probeNet() {
+  if (!navigator.onLine) return false;
+  const ctl = new AbortController(), to = setTimeout(() => ctl.abort(), 6000);
+  try {
+    // no-cors: no depende de permisos del servidor; cualquier respuesta (aunque sea un error HTTP) significa que hay internet
+    await fetch(CFG && CFG.url ? CFG.url + '/auth/v1/health' : location.origin + '/?ping=' + Date.now(), { mode: 'no-cors', cache: 'no-store', signal: ctl.signal });
+    return true;
+  } catch (e) { return false; } finally { clearTimeout(to); }
+}
+function resync() {            // de vuelta con internet: sube lo pendiente o trae lo último de la nube
+  if (!sb || !session || pushing) return;
+  if (dirty) push(); else if (!document.querySelector('dialog[open]')) pull();
+}
+function setNet(on) {
+  const was = netOnline, first = !netKnown; netKnown = true; netOnline = on;
+  $('net-banner').hidden = on;
+  setStatus(lastStatus[0], lastStatus[1]);
+  if (on === was && !first) return;
+  if (!on && !first) showToast('Te has quedado sin internet', null);       // se queda sin conexión con la app abierta: un aviso; si ya la abre sin internet, solo el cartel
+  if (on && !first && !was) { showToast('Conexión recuperada: sincronizando…', null); resync(); }
+  if (on && first && lastStatus[1] === 'off') resync();                    // la primera sincronización falló y ahora sí hay internet
+}
+async function checkNet() {
+  if (netChecking) return; netChecking = true;
+  try { setNet(await probeNet()); } finally { netChecking = false; }
+}
+function netLoop() { clearTimeout(netTimer); netTimer = setTimeout(async () => { if (!document.hidden) await checkNet(); netLoop(); }, NET_MS()); }
+window.addEventListener('offline', () => setNet(false));
+window.addEventListener('online', () => checkNet());
+document.addEventListener('visibilitychange', () => { if (!document.hidden) checkNet(); });
+checkNet(); netLoop();
+
 initCloud();
 
 // ---------- App instalable (PWA) ----------
