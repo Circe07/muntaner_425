@@ -42,9 +42,10 @@
   }
 
   // Tipo de producto de un grupo (para repartir las ventas por tipo cuando el texto no trae lista de modelos)
-  const TYPE_RULES = [['tablets', /\b(tablets?|tab\d*|\w*pad\d*|npc)\b/], ['relojes', /\b(wearables?|relojes?|\w*watch\d*|band\d*|pulseras?|iot)\b/], ['portatiles', /\b(portatiles?|laptops?|notebook|ordenadores?|\w*book\d*)\b/],
-    ['auriculares', /\b(auriculares?|\w*buds\d*|tws|earbuds|headphones?)\b/], ['tv', /\b(tv|televisor(es)?|television(es)?)\b/], ['accesorios', /\b(accesorios?|cargadores?|fundas?)\b/],
+  const TYPE_RULES = [['tablets', /\b(tablets?|tab\d*|\w*pad\d*|npc)\b|\btab[sa]?\d/], ['relojes', /watch|\b(relojes?|band\d*|pulseras?|iot)\b|w[ea]{1,2}r[ea]{0,2}bles?/], ['portatiles', /\b(portatiles?|laptops?|notebook|ordenadores?|\w*book\d*)\b/],
+    ['auriculares', /buds|\b(auriculares?|tws|earbuds|headphones?)\b/], ['tv', /\b(tv|televisor(es)?|television(es)?)\b/], ['accesorios', /\b(accesorios?|cargadores?|fundas?)\b/],
     ['moviles', /\b(moviles?|smartphones?|telefon\w*|phones?|hhp|handhelds?)\b/]];
+  const groupTypes = (name, type) => /w[ea]{1,2}r[ea]{0,2}bles?|\biot\b/.test(norm(name)) ? ['relojes', 'auriculares'] : type ? [type] : [];
   const inferType = text => { const n = norm(text); if (!n) return ''; for (const [k, re] of TYPE_RULES) if (re.test(n)) return k; return ''; };
   function normalizePlan(input) {
     const errors = [], warnings = [];
@@ -81,7 +82,7 @@
       const seen = new Map();
       strs(pick(g, 'modelos', 'models')).slice(0, 300).forEach(m => { if (!seen.has(norm(m))) seen.set(norm(m), m); });
       const type = inferType(pick(g, 'tipo', 'type')) || (seen.size ? '' : inferType(name));
-      groups.push({ id, name, models: [...seen.values()], type });
+      groups.push({ id, name, models: [...seen.values()], type, types: groupTypes(name, type) });
       gRef.set(id, id); gRef.set(slug(name), id);
     });
 
@@ -252,7 +253,7 @@
     if (named.length) return named.map(g => g.id);
     const byGama = gs.filter(g => norm(g.id) === norm(sale.gama)).map(g => g.id);
     if (byGama.length) return byGama;
-    return sale.tipo ? gs.filter(g => g.type && g.type === sale.tipo).map(g => g.id) : [];   // sin lista de modelos: por tipo de producto
+    return sale.tipo ? gs.filter(g => (g.types && g.types.length ? g.types : g.type ? [g.type] : []).includes(sale.tipo)).map(g => g.id) : [];   // sin lista de modelos: por tipo de producto
   }
   function matchesScope(plan, scope, sale) {
     if (!scope || scope.all) return true;
@@ -585,7 +586,7 @@
   // ---------- lista de modelos con la ayuda de la IA de la persona ----------
   function buildModelsPrompt(opts) {
     const o = opts || {}, groups = (o.groups || []).slice(0, 40);
-    const ej = { version: 1, modelos: [{ nombre: 'Galaxy S25 Ultra', tipo: 'moviles', grupo: 'HHP', pvp: 1299 }, { nombre: 'Galaxy Tab S10', tipo: 'tablets' }, { nombre: 'Galaxy Watch 8', tipo: 'relojes', nombre_reporte: 'Watch 8' }], notas: ['«Galaxy Buds» no encaja en ninguna categoría de mi lista: lo he puesto como auriculares.'] };
+    const ej = { version: 1, modelos: [{ nombre: 'Galaxy S25 Ultra', tipo: 'moviles', grupo: 'HHP', pvp: 1299 }, { nombre: 'Galaxy Tab S10', tipo: 'tablets', grupo: 'Tab NPC' }, { nombre: 'Galaxy Watch 8', tipo: 'relojes', grupo: 'Wearables', nombre_reporte: 'Watch 8' }, { nombre: 'Galaxy Buds 3', tipo: 'auriculares', grupo: 'Wearables' }, { nombre: 'Galaxy Book 5', tipo: 'portatiles' }], notas: ['«Galaxy Book 5» es un portátil y no hay categoría de portátiles en mis objetivos: lo dejo sin grupo.'] };
     return [
       'TAREA: convierte la lista de modelos que hay AL FINAL de este mensaje (texto o foto/captura adjunta) en un JSON con el formato de abajo. Es para mi app "Ventas del mes", que lo lee automáticamente.',
       '',
@@ -594,10 +595,12 @@
       '2. Tu respuesta debe ser SOLO un bloque de código ```json con el JSON. Nada de texto antes ni después.',
       '3. Usa SOLO los modelos que aparezcan en mi lista o foto. NUNCA añadas modelos de memoria, de otra marca ni del ejemplo.',
       '4. Una entrada por modelo. Las variantes del mismo modelo (color, memoria, códigos de artículo, precio) se unen en una sola entrada con el nombre corto que usaría un vendedor (p. ej. «Galaxy A56 8/256 GB negro (1234567)» → «Galaxy A56»), salvo que mi lista trate las variantes como productos distintos.',
-      '5. "tipo" es el tipo de producto: "moviles" (teléfonos), "tablets", "relojes" (relojes, pulseras, wearables), "portatiles", "auriculares", "tv", "accesorios". Dedúcelo del producto; si mi lista ya viene agrupada por categorías, respétalas.',
-      '6. "grupo" es opcional: ponlo solo si mi lista asigna ese modelo a una de estas categorías y escríbela EXACTAMENTE como aquí: ' + (groups.length ? groups.map(g => '«' + g + '»').join(', ') : '(no hay ninguna todavía; no pongas "grupo")') + '.',
-      '7. "nombre_reporte" es opcional: el nombre comercial corto con el que quiero que salga el modelo en mi reporte diario, SIN la marca. Si mi lista no lo indica, no lo pongas.',
-      '8. "pvp" es opcional: el precio de venta al público del modelo si mi lista lo trae (columna PVP, precio…), solo el número (349.9). Si no lo trae, no lo pongas ni lo inventes.',
+      '5. CLASIFICA TODOS LOS MODELOS: cada modelo lleva "tipo" y NINGUNO puede quedarse sin él. Usa lo que sabes del producto, aunque mi lista no lo diga. Valores: "moviles" (teléfonos, plegables Flip/Fold incluidos), "tablets" (Tab, Pad, TAB S…, TABA…), "relojes" (Watch, Fit, Band, Ring/anillo, pulseras y cualquier wearable), "auriculares" (Buds, TWS, earbuds), "portatiles" (Book, laptop), "tv", "accesorios". Pistas: TAB/TABS/TABA/PAD = tablets; WATCH/FIT/BAND/RING = relojes; BUDS/TWS = auriculares; BOOK/LAPTOP = portatiles; el resto de teléfonos (S23, A55, Z FLIP5, Redmi Note…) = moviles. Si mi lista ya viene agrupada por categorías, respétalas.',
+      '6. Los nombres pueden venir como códigos pegados en mayúsculas (TABS6LITE, BUDS2PRO, S23ULTRA, ZFLIP5, WATCH5PRO, BOOK4PRO360, TABS9FE+). Interprétalos y escribe en "nombre" el nombre legible del producto (Galaxy Tab S6 Lite, Galaxy Buds 2 Pro, Galaxy S23 Ultra, Galaxy Z Flip 5…). Los códigos de color, almacenamiento o artículo no son modelos distintos: únelos.',
+      '7. "grupo": si más abajo te doy una lista de categorías de mis objetivos, ASIGNA CADA MODELO a la que le corresponda por el tipo de producto, aunque mi lista no lo diga expresamente, y escríbela EXACTAMENTE como está: ' + (groups.length ? groups.map(g => '«' + g + '»').join(', ') : '(no hay ninguna todavía; no pongas "grupo")') + '. Una categoría «Wearables» incluye relojes, pulseras, anillos y auriculares (Buds); una de tablets, las tablets; una de móviles/HHP, los teléfonos. Si de verdad no hay categoría para un modelo (p. ej. portátiles cuando no hay una categoría de portátiles), no pongas "grupo" en ese modelo y dilo en "notas". Nunca dejes fuera un modelo de la lista "modelos".',
+      '8. "nombre_reporte" es opcional: un nombre corto y legible para mi reporte diario, SIN la marca (p. ej. «Tab S6 Lite», «Buds 2 Pro»). NUNCA copies códigos pegados en mayúsculas (TABS6LITE) ni uses el nombre completo con la marca. Si no aporta nada distinto de "nombre", no lo pongas.',
+      '9. "pvp" es opcional: el precio de venta al público del modelo si mi lista lo trae (columna PVP, precio…), solo el número (349.9). Si no lo trae, no lo pongas ni lo inventes.',
+      '10. Si algún modelo es realmente imposible de clasificar, ponlo igualmente en "modelos" SIN "tipo" ni "grupo" y explícalo en "notas": la app lo dejará como «sin clasificar» para que yo lo elija. Es la única excepción.',
       '',
       'FORMATO DEL JSON',
       '{ "version": 1,',

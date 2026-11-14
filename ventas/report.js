@@ -19,10 +19,10 @@
   // Pistas por nombre. Se miran en orden: lo primero que encaja gana.
   const RULES = [
     // el número puede ir pegado a la palabra (Book4, Buds3, Band9, Pad2, MatePad, MagicBook…)
-    ['tablets', /\b(\w*pad\d*|tab\d*|tablets?)\b/],
-    ['relojes', /\b(\w*watch\d*|watches|relojes?|band\d*|fit\d*|wearables?|pulseras?)\b/],
-    ['portatiles', /\b(\w*book\d*|laptops?|notebook|portatiles?|ordenadores?)\b/],
-    ['auriculares', /\b(\w*buds\d*|tws|airpods|auriculares?|earbuds|headphones?)\b/],
+    ['tablets', /\b(\w*pad\d*|tab\d*|tablets?)\b|\btab[sa]?\d/],            // TABS6LITE, TABA9+, Tab S10…
+    ['relojes', /watch|\b(relojes?|band\d*|fit\d*|pulseras?|ring)\b|w[ea]{1,2}r[ea]{0,2}bles?|\biot\b/],   // WATCH5PRO, Galaxy Ring, «Wereables»…
+    ['portatiles', /\b(\w*book\d*|laptops?|notebook|portatiles?|ordenadores?)\b|book\d/],           // BOOK4PRO360…
+    ['auriculares', /buds|\b(tws|airpods|auriculares?|earbuds|headphones?)\b/],                          // BUDS2PRO, BUDSFE…
     ['tv', /\b(tv|televisor|televisores|television|televisiones)\b/],
     ['accesorios', /\b(charger|cargador|cargadores|cable|cables|funda|fundas|cover|adaptador|powerbank|accesorio|accesorios)\b/],
     ['moviles', /\b(movil|moviles|smartphone|smartphones|telefono|telefonos|phone|phones|hhp|handheld)\b/]
