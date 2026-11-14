@@ -57,7 +57,7 @@
       <button type="button" class="ag-btn ag-btn--glass body" id="add-line">+ Añadir otro modelo a esta venta</button>
       <button class="ag-btn ag-btn--primary body" id="sale-submit" disabled>Añadir venta</button>
     </form>
-    <p class="hint footnote" id="no-models" hidden>Primero añade algún modelo en “Modelos”.</p>
+    <div class="no-models" id="no-models" hidden><p class="hint footnote">Para registrar una venta primero necesitas tener modelos en tu lista.</p><button type="button" class="ag-btn ag-btn--primary body" id="go-models">Añadir mis modelos</button></div>
   </section>
 
   <section class="card ag-card ag-grain">
@@ -98,7 +98,7 @@
     <table id="sales"><thead><tr><th>Fecha</th><th>Modelo</th><th>Grupo</th><th class="n">Uds.</th><th></th></tr></thead><tbody></tbody></table>
   </section>
 
-  <section class="card ag-card ag-grain">
+  <section class="card ag-card ag-grain" id="models-card">
     <h2 class="title3">Modelos</h2>
     <form id="model-form">
       <label>Nombre <input class="ag-input body" id="model-name" required placeholder="Ej. Modelo X"></label>
@@ -115,6 +115,7 @@
       <button class="ag-btn ag-btn--glass body" type="button" id="mi-copy">Copiar instrucciones</button>
       <textarea class="ag-input body" id="mi-fallback" rows="5" readonly hidden aria-label="Instrucciones para copiar"></textarea>
       <textarea class="ag-input body" id="mi-paste" rows="5" placeholder="Pega aquí la respuesta de tu IA (el JSON)" spellcheck="false"></textarea>
+      <button type="button" class="ag-btn ag-btn--glass footnote ta-clear" data-clear="mi-paste" hidden>✕ Borrar todo</button>
       <ul class="pd-errors" id="mi-errors" hidden></ul>
       <button class="ag-btn ag-btn--primary body" type="button" id="mi-add">Añadir estos modelos</button>
       <p class="hint footnote" id="mi-msg" role="status" hidden></p>
@@ -173,7 +174,8 @@
       <li><strong>Pégalas en tu IA</strong> y, justo debajo, pega el correo o comunicado de objetivos.
         <span class="ai-links">Abrir: <a href="https://gemini.google.com/app" target="_blank" rel="noopener">Gemini</a> · <a href="https://chatgpt.com/" target="_blank" rel="noopener">ChatGPT</a> · <a href="https://claude.ai/new" target="_blank" rel="noopener">Claude</a></span></li>
       <li><strong>Si te hace preguntas, respóndelas.</strong> Cuando te dé el resultado (un bloque de código), cópialo y pégalo aquí:
-        <textarea class="ag-input" id="pd-paste" rows="6" placeholder="Pega aquí la respuesta de tu IA" spellcheck="false" autocapitalize="none"></textarea></li>
+        <textarea class="ag-input" id="pd-paste" rows="6" placeholder="Pega aquí la respuesta de tu IA" spellcheck="false" autocapitalize="none"></textarea>
+        <button type="button" class="ag-btn ag-btn--glass footnote ta-clear" data-clear="pd-paste" hidden>✕ Borrar todo</button></li>
     </ol>
     <ul class="pd-errors" id="pd-errors" hidden></ul>
     <div class="row"><button type="button" class="ag-btn ag-btn--glass body" data-back>Volver</button><button type="button" class="ag-btn ag-btn--primary body" id="pd-review-btn">Revisar</button></div>

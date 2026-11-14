@@ -286,3 +286,7 @@ html:has(dialog[open]){overflow:hidden}
   #plan-dialog .row,#report-dialog .row{margin:var(--space-3) calc(-1*var(--space-4)) calc(-1*var(--space-4));padding:var(--space-3) var(--space-4)}}
 
 dialog{max-height:92vh;max-height:calc(100dvh - 24px);overscroll-behavior:contain}
+
+.no-models{display:grid;gap:var(--space-3)}.no-models[hidden]{display:none}.no-models p{margin:0}
+.ta-clear{margin-top:var(--space-2);min-height:36px;padding:0 var(--space-4);width:auto;align-self:flex-start}.ta-clear[hidden]{display:none}
+@keyframes flash-card{0%{box-shadow:0 0 0 3px var(--accent)}100%{box-shadow:0 0 0 0 transparent}}.flash{animation:flash-card 1.6s ease-out}

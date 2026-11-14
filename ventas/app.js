@@ -472,7 +472,7 @@ $('mi-add').onclick = () => {
   });
   list.innerHTML = warn.map(w => `<li>${esc(w)}</li>`).join(''); list.hidden = !warn.length;
   save(); render();
-  $('mi-paste').value = '';
+  $('mi-paste').value = ''; $('mi-paste').dispatchEvent(new Event('input'));
   msg.textContent = `✓ ${added} modelo${added === 1 ? '' : 's'} nuevo${added === 1 ? '' : 's'}${updated ? `, ${updated} ya existente${updated === 1 ? '' : 's'} actualizado${updated === 1 ? '' : 's'}` : ''}.` + (r.notes.length ? ' Notas de tu IA: ' + r.notes.join(' ') : '');
   msg.hidden = false;
 };
@@ -983,3 +983,22 @@ $('share').onclick = async () => {
 };
 updateInstallUI();
 if ('serviceWorker' in navigator && /^https?:$/.test(location.protocol)) window.addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));
+
+// atajo desde «Añadir venta» a la lista de modelos (cuenta sin modelos)
+$('go-models').onclick = () => {
+  const card = $('models-card'), reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  card.scrollIntoView({ behavior: reduce ? 'auto' : 'smooth', block: 'start' });
+  card.classList.remove('flash'); void card.offsetWidth; card.classList.add('flash');
+  $('models-ai').open = true;
+  setTimeout(() => { try { $('model-name').focus({ preventScroll: true }); } catch (e) {} }, reduce ? 0 : 450);
+};
+// «Borrar todo» en los cuadros donde se pega un JSON: aparece cuando hay texto
+document.querySelectorAll('.ta-clear').forEach(btn => {
+  const ta = $(btn.dataset.clear), sync = () => { btn.hidden = !ta.value; };
+  ta.addEventListener('input', sync);
+  btn.onclick = () => {
+    ta.value = ''; sync(); ta.focus();
+    const err = ta.id === 'pd-paste' ? $('pd-errors') : $('mi-errors'); if (err) err.hidden = true;
+  };
+  sync();
+});
