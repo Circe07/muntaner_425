@@ -416,3 +416,22 @@ section.card:has(#logout)>.file{margin:0}
 #plan-dialog .pd-head h2,#report-dialog .pd-head h2{min-width:0;margin:0;overflow-wrap:anywhere}
 .pd-head{gap:var(--space-2)}
 .cls-chip .cls-n{font-size:inherit;line-height:inherit}
+
+/* ================= Rendimiento: menos trabajo de pintado al desplazar ================= */
+/* el fondo con resplandores va en una capa fija propia: se dibuja una vez y no se repinta al hacer scroll */
+html{background:var(--canvas)}
+body{background:transparent!important}
+body::before{content:"";position:fixed;inset:0;z-index:-1;pointer-events:none;transform:translateZ(0);background:
+    radial-gradient(75vw 42vh at 6% -4%,color-mix(in srgb,var(--accent) var(--gl-a),transparent),transparent 72%),
+    radial-gradient(60vw 40vh at 104% 34%,color-mix(in srgb,var(--success) var(--gl-s),transparent),transparent 72%),
+    radial-gradient(70vw 42vh at -4% 82%,color-mix(in srgb,var(--warning) var(--gl-w),transparent),transparent 72%),
+    radial-gradient(70vw 36vh at 100% 100%,color-mix(in srgb,var(--accent-pressed) var(--gl-p),transparent),transparent 72%),
+    radial-gradient(46vw 24vh at 92% 58%,color-mix(in srgb,var(--accent) var(--gl-s),transparent),transparent 72%),
+    radial-gradient(44vw 22vh at 4% 52%,color-mix(in srgb,var(--accent-pressed) var(--gl-w),transparent),transparent 72%)}
+/* el grano: una textura fija en lugar de un filtro SVG calculado al vuelo y sin modo de fusión */
+.ag-grain::after{background-image:url(icons/noise.png);background-size:64px 64px;mix-blend-mode:normal;opacity:.025}
+/* sin desenfoques anidados: los controles ya están sobre una tarjeta de cristal desenfocada */
+.ag-input,.card .ag-btn,.card .cls-chip,dialog .ag-input,dialog .ag-btn{-webkit-backdrop-filter:none;backdrop-filter:none}
+/* desenfoque de las tarjetas algo más corto (cuesta menos y apenas se nota) */
+.card.ag-card,.topbar{-webkit-backdrop-filter:blur(22px) saturate(180%);backdrop-filter:blur(22px) saturate(180%)}
+@media(prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}

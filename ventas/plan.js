@@ -22,8 +22,9 @@
     return t === '' ? NaN : Number(t);
   };
   const r8 = n => Math.round(n * 1e8) / 1e8;
-  const eur = n => (Math.round(n * 100) / 100).toLocaleString('es-ES', { maximumFractionDigits: 2 }) + ' €';
-  const eur0 = n => Math.round(n).toLocaleString('es-ES') + ' €';
+  const NF2 = new Intl.NumberFormat('es-ES', { maximumFractionDigits: 2 }), NF0 = new Intl.NumberFormat('es-ES');   // un solo formateador: crear uno por número es lento
+  const eur = n => NF2.format(Math.round(n * 100) / 100) + ' €';
+  const eur0 = n => NF0.format(Math.round(n)) + ' €';
   const fmtV = (metric, v) => metric === 'revenue' ? eur0(v) : String(Math.round(v * 100) / 100).replace('.', ',');
   const ddmm = d => d ? d.slice(8) + '/' + d.slice(5, 7) : '';
   const periodText = p => !p ? '' : p.from && p.to ? `del ${ddmm(p.from)} al ${ddmm(p.to)}` : p.from ? `desde el ${ddmm(p.from)}` : `hasta el ${ddmm(p.to)}`;

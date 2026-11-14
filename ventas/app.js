@@ -116,7 +116,7 @@ function migrate(s) {
   return s;
 }
 function persistLocal() { try { localStorage.setItem(KEY, JSON.stringify(state)); } catch (e) { alert('No se pudo guardar en el navegador.'); } }
-function save() { persistLocal(); schedulePush(); }
+function save() { resetMemos(); persistLocal(); schedulePush(); }
 
 // ---------- planes de objetivos (el cálculo vive en plan.js) ----------
 const monthKeys = () => [...new Set([...Object.keys(state.plans || {}).filter(k => (state.plans[k] || []).length), ...Object.keys(state.goals || {})])].sort();
@@ -134,7 +134,12 @@ function plansOf(m) {
 }
 const hasGoals = m => plansOf(m).length > 0;
 // tipo de producto de la venta (para los grupos que no traen lista de modelos): el elegido a mano en el modelo o el que sale del nombre
-const saleKind = s => { const m = state.models.find(x => norm(x.name) === norm(s.name)); return Report.deviceType(s.name, '', m && m.tipo); };
+// memorias de cada pintado: se vacían al pintar y al guardar (clasificar 150 modelos una y otra vez era lo más lento)
+var kindMemo = new Map(), classMemo = new Map();
+const resetMemos = () => { kindMemo = new Map(); classMemo = new Map(); };
+const saleKind = s => { const k = norm(s.name); let v = kindMemo.get(k); if (v === undefined) { const m = state.models.find(x => norm(x.name) === k); v = Report.deviceType(s.name, '', m && m.tipo); kindMemo.set(k, v); } return v; };
+// solo reescribe una zona de la página si su contenido ha cambiado (evita rehacer cientos de elementos en cada pintado)
+const setHTML = (el, html) => { if (el.__h !== html) { el.innerHTML = html; el.__h = html; } };
 const withKind = s => ({ ...s, tipo: saleKind(s) });
 const evalMonth = (m, sales) => Plan.evaluateAll(plansOf(m), sales.map(withKind), state.sales.map(withKind));
 // último mes anterior con un plan mensual (sin fechas propias) que se pueda repetir
@@ -157,6 +162,10 @@ function groupOfName(name, gama) {
 }
 // clase (grupo) de un modelo: la de los objetivos del mes o, si no, la que tenga asignada; '' = sin clase
 function classIdOf(m) {
+  const ck = month + '|' + m.id; if (classMemo.has(ck)) return classMemo.get(ck);
+  const v = classIdOfRaw(m); classMemo.set(ck, v); return v;
+}
+function classIdOfRaw(m) {
   let id = null;
   for (const p of plansOf(month)) { id = Plan.groupIdsOf(p, { name: m.name, gama: m.gama, tipo: saleKind({ name: m.name }) })[0]; if (id) break; }
   id = id || m.gama;
@@ -183,10 +192,10 @@ const inClass = (m, cls) => !cls || classIdOf(m) === cls;
 // rellena una fila de la venta: botones de clase y modelos de esa clase (con la clase elegida, el modelo va sin etiqueta)
 function fillRow(row) {
   const cs = row.querySelector('.sl-class'), sel = row.querySelector('.sl-model'), picked = sel.value;
-  const ch = classChips(row.dataset.cls || ''); row.dataset.cls = ch.value; cs.innerHTML = ch.html;
+  const ch = classChips(row.dataset.cls || ''); row.dataset.cls = ch.value; setHTML(cs, ch.html);
   row.querySelector('.sl-class-wrap').hidden = currentGroups().length < 2 || state.models.length < 2;
   const list = state.models.filter(m => inClass(m, ch.value));
-  sel.innerHTML = '<option value="" selected disabled>' + (list.length ? 'Elige un modelo…' : 'No hay modelos en esta clase') + '</option>' + list.map(m => { const g = ch.value || classIdOf(m) === 'tipo:moviles' ? '' : classLabelOf(m); return `<option value="${m.id}">${esc(m.name)}${g ? ` · ${esc(g)}` : ''}</option>`; }).join('');
+  setHTML(sel, '<option value="" selected disabled>' + (list.length ? 'Elige un modelo…' : 'No hay modelos en esta clase') + '</option>' + list.map(m => { const g = ch.value || classIdOf(m) === 'tipo:moviles' ? '' : classLabelOf(m); return `<option value="${m.id}">${esc(m.name)}${g ? ` · ${esc(g)}` : ''}</option>`; }).join(''));
   if (list.some(m => m.id === picked)) sel.value = picked;
 }
 function tagHtml(name, gama) {
@@ -230,6 +239,7 @@ function objectiveCard(o, ev, idx) {
 }
 
 function render() {
+  resetMemos();
   $('month').value = month;
   $('month-label').textContent = monthName(month);
   const plans = plansOf(month), sales = monthSales();
@@ -296,34 +306,34 @@ function render() {
     map.get(k).qty += s.qty;
   });
   const mrows = [...map.values()].sort((a, b) => b.qty - a.qty || a.name.localeCompare(b.name));
-  $('by-model').tBodies[0].innerHTML = mrows.length
+  setHTML($('by-model').tBodies[0], mrows.length
     ? mrows.map(r => `<tr><td>${esc(r.name)}</td><td>${tagHtml(r.name, r.gama)}</td><td class="n">${r.qty}</td></tr>`).join('')
-    : '<tr><td colspan="3" class="empty">Sin datos</td></tr>';
+    : '<tr><td colspan="3" class="empty">Sin datos</td></tr>');
   const top = mrows.filter(r => r.qty > 0 && !r.name.startsWith('Acumulado')).slice(0, 5);
   $('top').innerHTML = top.length ? top.map(r => `<li>${esc(r.name)} <span>${r.qty}</span></li>`).join('') : '<li class="empty">Aún no hay ventas este mes</li>';
 
   // listado de ventas
   $('total').textContent = sales.reduce((a, s) => a + s.qty, 0) + ' uds.';
-  $('sales').tBodies[0].innerHTML = sales.length
+  setHTML($('sales').tBodies[0], sales.length
     ? sales.map(s => `<tr><td class="nw">${s.date.slice(8)}/${s.date.slice(5, 7)}</td><td>${esc(s.name)}${s.qty < 0 ? ' <span class="ret">devolución</span>' : ''}${s.amount ? ` <small class="amt">${eur(s.amount)}</small>` : ''}</td><td>${tagHtml(s.name, s.gama)}</td><td class="n">${s.qty < 0 ? '−' + Math.abs(s.qty) : s.qty}</td><td class="n"><button class="del" aria-label="Borrar venta" data-sale="${s.id}" title="Borrar">✕</button></td></tr>`).join('')
-    : '<tr><td colspan="5" class="empty">Sin ventas este mes</td></tr>';
+    : '<tr><td colspan="5" class="empty">Sin ventas este mes</td></tr>');
 
   // gestión de modelos y grupos
   const gOpts = sel => gs.map(g => `<option value="${esc(g.id)}"${g.id === sel ? ' selected' : ''}>${esc(g.name)}</option>`).join('') + `<option value=""${sel === '' ? ' selected' : ''}>Sin grupo</option>`;
   const prevGroup = $('model-gama').value;
-  $('model-gama').innerHTML = gOpts(gs.some(g => g.id === prevGroup) || prevGroup === '' ? prevGroup : gs[0].id);
+  setHTML($('model-gama'), gOpts(gs.some(g => g.id === prevGroup) || prevGroup === '' ? prevGroup : gs[0].id));
   const mf = $('models-filter'), mch = classChips(mf.dataset.cls || '');
-  mf.dataset.cls = mch.value; mf.innerHTML = mch.html;
+  mf.dataset.cls = mch.value; setHTML(mf, mch.html);
   $('models-filter-wrap').hidden = gs.length < 2 || state.models.length < 6;
   const shown = state.models.filter(m => inClass(m, $('models-filter-wrap').hidden ? '' : mch.value));
-  $('models').innerHTML = shown.length
+  setHTML($('models'), shown.length
     ? shown.map(m => {
         const extra = (!m.gama || gs.some(g => g.id === m.gama)) ? '' : `<option value="${esc(m.gama)}" selected>${esc(LABEL[m.gama] || m.gama)}</option>`;
         const guess = Report.typeOf(Report.deviceType(m.name, groupOfName(m.name, m.gama).name)).label;
         const tipoSel = `<select class="ag-input footnote" data-tipo="${m.id}" aria-label="Tipo de producto"><option value="">Tipo: ${esc(guess)}</option>${Report.TYPES.map(t => `<option value="${t.key}"${m.tipo === t.key ? ' selected' : ''}>${t.label}</option>`).join('')}</select>`;
         return `<li><span>${esc(m.name)}${m.alias ? ` <small class="amt">→ ${esc(m.alias)}</small>` : ''}${m.price ? ` <small class="amt">${eur(m.price)}</small>` : ''}</span><span class="m-btns"><button class="del" aria-label="Precio del modelo" data-price="${m.id}" title="Precio de venta (PVP): se rellena solo al vender">€</button><button class="del" aria-label="Nombre en el reporte" data-alias="${m.id}" title="Nombre en el reporte de WhatsApp">✎</button><button class="del" aria-label="Quitar modelo" data-model="${m.id}" title="Quitar modelo">✕</button></span><span class="m-sel"><select class="ag-input footnote" data-gama="${m.id}" aria-label="Grupo">${extra}${gOpts(m.gama)}</select>${tipoSel}</span></li>`;
       }).join('')
-    : `<li class="empty">${state.models.length ? 'No hay modelos en esta clase' : 'No hay modelos todavía'}</li>`;
+    : `<li class="empty">${state.models.length ? 'No hay modelos en esta clase' : 'No hay modelos todavía'}</li>`);
   $('models-clear').hidden = !state.models.length;
   if (!state.models.length && !$('models-ai').dataset.touched) $('models-ai').open = true;
 }
@@ -374,10 +384,10 @@ function updateSaleForm() {
   $('sale-grand').hidden = !(n > 1 && needsAmount() && all > 0);
   if (!$('sale-grand').hidden) $('sale-grand').textContent = `Total de la venta (${n} modelos): ${eur(all)}`;
 }
-function showToast(msg, undo) {
-  $('toast-msg').textContent = msg; $('toast').hidden = false; $('toast-undo').hidden = !undo;
+function showToast(msg, undo, label, ms) {
+  $('toast-msg').textContent = msg; $('toast').hidden = false; $('toast-undo').hidden = !undo; $('toast-undo').textContent = label || 'Deshacer';
   $('toast-undo').onclick = () => { if (undo) undo(); $('toast').hidden = true; clearTimeout(toastTimer); };
-  clearTimeout(toastTimer); toastTimer = setTimeout(() => { $('toast').hidden = true; }, 8000);
+  clearTimeout(toastTimer); toastTimer = setTimeout(() => { $('toast').hidden = true; }, ms || 8000);
 }
 document.querySelectorAll('.seg-btn').forEach(b => b.onclick = () => {
   kind = b.dataset.kind;
@@ -1033,7 +1043,15 @@ $('share').onclick = async () => {
   try { await navigator.clipboard.writeText(url); showToast('Enlace copiado', null); } catch (e) { prompt('Copia este enlace:', url); }
 };
 updateInstallUI();
-if ('serviceWorker' in navigator && /^https?:$/.test(location.protocol)) window.addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));
+if ('serviceWorker' in navigator && /^https?:$/.test(location.protocol)) {
+  window.addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));
+  // la app se abre al instante desde la copia guardada; cuando llega una versión nueva se avisa para cargarla
+  let hadController = !!navigator.serviceWorker.controller;
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    if (!hadController) { hadController = true; return; }               // primera instalación: nada que avisar
+    showToast('Hay una versión nueva de la app', () => location.reload(), 'Actualizar', 20000);
+  });
+}
 
 // atajo desde «Añadir venta» a la lista de modelos (cuenta sin modelos)
 $('go-models').onclick = () => {
