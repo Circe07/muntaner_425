@@ -160,7 +160,13 @@ function classIdOf(m) {
   let id = null;
   for (const p of plansOf(month)) { id = Plan.groupIdsOf(p, { name: m.name, gama: m.gama, tipo: saleKind({ name: m.name }) })[0]; if (id) break; }
   id = id || m.gama;
-  return currentGroups().some(x => x.id === id) ? id : '';
+  if (currentGroups().some(x => x.id === id)) return id;
+  return 'tipo:' + saleKind({ name: m.name });          // sin grupo en los objetivos: se clasifica por su tipo de producto (Portátiles, Accesorios…)
+}
+function classLabelOf(m) {
+  const id = classIdOf(m);
+  if (id.startsWith('tipo:')) return Report.typeOf(id.slice(5)).label;
+  const g = currentGroups().find(x => x.id === id); return g ? shortName(g.name) : '';
 }
 // nombre corto de la clase: sin la aclaración entre paréntesis («HHP (móviles)» → «HHP»)
 const shortName = n => String(n || '').replace(/\s*\([^)]*\)\s*$/, '').trim() || String(n || '');
@@ -169,18 +175,18 @@ function classChips(selected) {
   const gs = currentGroups(), cnt = new Map();
   state.models.forEach(m => { const k = classIdOf(m); cnt.set(k, (cnt.get(k) || 0) + 1); });
   const items = [['', 'Todas', state.models.length], ...gs.filter(g => cnt.get(g.id)).map(g => [g.id, shortName(g.name), cnt.get(g.id)])];
-  if (cnt.get('')) items.push(['__none', 'Sin clase', cnt.get('')]);
+  Report.TYPES.forEach(t => { if (cnt.get('tipo:' + t.key)) items.push(['tipo:' + t.key, t.label, cnt.get('tipo:' + t.key)]); });   // los tipos de producto sin grupo en los objetivos
   const value = items.some(x => x[0] === selected) ? selected : '';
   return { value, html: items.map(([v, label, n]) => `<button type="button" class="cls-chip" data-cls="${esc(v)}" aria-pressed="${v === value}">${esc(label)}:<span class="cls-n">${n}</span></button>`).join('') };
 }
-const inClass = (m, cls) => !cls || (cls === '__none' ? classIdOf(m) === '' : classIdOf(m) === cls);
+const inClass = (m, cls) => !cls || classIdOf(m) === cls;
 // rellena una fila de la venta: botones de clase y modelos de esa clase (con la clase elegida, el modelo va sin etiqueta)
 function fillRow(row) {
   const cs = row.querySelector('.sl-class'), sel = row.querySelector('.sl-model'), picked = sel.value;
   const ch = classChips(row.dataset.cls || ''); row.dataset.cls = ch.value; cs.innerHTML = ch.html;
   row.querySelector('.sl-class-wrap').hidden = currentGroups().length < 2 || state.models.length < 2;
   const list = state.models.filter(m => inClass(m, ch.value));
-  sel.innerHTML = '<option value="" selected disabled>' + (list.length ? 'Elige un modelo…' : 'No hay modelos en esta clase') + '</option>' + list.map(m => { const g = ch.value ? '' : shortName(groupOfName(m.name, m.gama).name); return `<option value="${m.id}">${esc(m.name)}${g ? ` · ${esc(g)}` : ''}</option>`; }).join('');
+  sel.innerHTML = '<option value="" selected disabled>' + (list.length ? 'Elige un modelo…' : 'No hay modelos en esta clase') + '</option>' + list.map(m => { const g = ch.value ? '' : classLabelOf(m); return `<option value="${m.id}">${esc(m.name)}${g ? ` · ${esc(g)}` : ''}</option>`; }).join('');
   if (list.some(m => m.id === picked)) sel.value = picked;
 }
 function tagHtml(name, gama) {
