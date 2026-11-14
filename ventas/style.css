@@ -391,3 +391,28 @@ section.card:has(#logout)>.file{margin:0}
 .pwbox{margin:var(--space-2) 0}
 .bar>b span{white-space:nowrap}
 .miss strong{white-space:nowrap}
+
+/* Responsividad: cabecera, venta y ventanas */
+.topbar>*{min-width:0}
+.topbar h1{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.topbar .sync-dot{flex:none}
+.month{flex:0 0 auto;max-width:100%}
+.month .monthpick{flex:1 1 auto;min-width:max-content}
+.monthlabel{white-space:nowrap;max-width:100%;overflow:hidden;text-overflow:ellipsis;padding:0 var(--space-1)}
+.ag-navbar__action{min-width:32px;min-height:36px;flex:none}
+@media(max-width:360px){.topbar{gap:var(--space-1);padding:0 var(--space-1)}.topbar h1{font-size:14px}.monthlabel{font-size:13px}}
+@media(max-width:340px){.topbar h1{font-size:13px}.monthlabel{font-size:12px;padding:0 2px}}
+/* chips de clase y añadir modelo */
+#sale-class,.sale-line .sl-class{display:flex;flex-wrap:wrap;gap:var(--space-2)}
+#sale-class .cls-chip,.sale-line .sl-class .cls-chip{white-space:nowrap;flex:none}
+#add-line{white-space:nowrap;max-width:100%;padding-inline:var(--space-2);font-size:14px;min-height:44px;height:auto}
+@media(max-width:340px){#add-line{font-size:13px;padding-inline:var(--space-1)}}
+/* ventanas: textos de botón en una línea; si no caben, pasan a dos filas */
+#plan-dialog .row,#report-dialog .row{flex-wrap:wrap}
+#plan-dialog .row .ag-btn,#report-dialog .row .ag-btn{white-space:nowrap;flex:1 1 auto;min-width:0;padding-inline:var(--space-3)}
+#pd-period .row .ag-btn[data-back]{flex:1 1 100%}
+#pd-review .row .ag-btn[data-back]{flex:0 1 auto}
+#pd-x,#rp-x{flex:none;width:40px;height:40px}
+#plan-dialog .pd-head h2,#report-dialog .pd-head h2{min-width:0;margin:0;overflow-wrap:anywhere}
+.pd-head{gap:var(--space-2)}
+.cls-chip .cls-n{font-size:inherit;line-height:inherit}
