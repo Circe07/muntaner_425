@@ -292,5 +292,6 @@ dialog{max-height:92vh;max-height:calc(100dvh - 24px);overscroll-behavior:contai
 .ta-clear{margin-top:var(--space-2);min-height:36px;padding:0 var(--space-4);width:auto;align-self:flex-start}.ta-clear[hidden]{display:none}
 @keyframes flash-card{0%{box-shadow:0 0 0 3px var(--accent)}100%{box-shadow:0 0 0 0 transparent}}.flash{animation:flash-card 1.6s ease-out}
 
-.net-banner{display:flex;align-items:center;justify-content:center;gap:8px;padding:3px var(--space-3);font-size:12px;line-height:1.25;text-align:center;color:var(--ink);background:color-mix(in srgb,var(--danger) 16%,var(--canvas-raised));border-bottom:1px solid color-mix(in srgb,var(--danger) 40%,transparent)}
+.net-banner{display:flex;align-items:center;justify-content:center;gap:8px;padding:3px var(--space-3);font-size:clamp(10.5px,3.3vw,12.5px);line-height:1.25;white-space:nowrap;text-align:center;color:var(--ink);background:color-mix(in srgb,var(--danger) 16%,var(--canvas-raised));border-bottom:1px solid color-mix(in srgb,var(--danger) 40%,transparent)}
 .net-banner[hidden]{display:none}.net-dot{width:7px;height:7px;border-radius:50%;background:var(--danger);flex:none}
+.net-text{min-width:0;overflow:hidden;text-overflow:ellipsis}
