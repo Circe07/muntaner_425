@@ -186,7 +186,7 @@ function fillRow(row) {
   const ch = classChips(row.dataset.cls || ''); row.dataset.cls = ch.value; cs.innerHTML = ch.html;
   row.querySelector('.sl-class-wrap').hidden = currentGroups().length < 2 || state.models.length < 2;
   const list = state.models.filter(m => inClass(m, ch.value));
-  sel.innerHTML = '<option value="" selected disabled>' + (list.length ? 'Elige un modelo…' : 'No hay modelos en esta clase') + '</option>' + list.map(m => { const g = ch.value ? '' : classLabelOf(m); return `<option value="${m.id}">${esc(m.name)}${g ? ` · ${esc(g)}` : ''}</option>`; }).join('');
+  sel.innerHTML = '<option value="" selected disabled>' + (list.length ? 'Elige un modelo…' : 'No hay modelos en esta clase') + '</option>' + list.map(m => { const g = ch.value || classIdOf(m) === 'tipo:moviles' ? '' : classLabelOf(m); return `<option value="${m.id}">${esc(m.name)}${g ? ` · ${esc(g)}` : ''}</option>`; }).join('');
   if (list.some(m => m.id === picked)) sel.value = picked;
 }
 function tagHtml(name, gama) {
