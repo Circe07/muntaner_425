@@ -297,23 +297,27 @@ dialog{max-height:92vh;max-height:calc(100dvh - 24px);overscroll-behavior:contai
 .net-text{min-width:0;overflow:hidden;text-overflow:ellipsis}
 
 /* ================= Glassmorphism (capa visual): mismos tokens de Aleh Glass, más cristal ================= */
-:root{--gl-a:36%;--gl-s:26%;--gl-w:22%;--gl-p:34%;--sheen:color-mix(in srgb,var(--glass-highlight) 55%,transparent)}
-@media(prefers-color-scheme:dark){:root{--gl-a:55%;--gl-s:40%;--gl-w:34%;--gl-p:50%}}
+:root{--gl-a:40%;--gl-s:30%;--gl-w:26%;--gl-p:38%;--sheen:color-mix(in srgb,var(--glass-highlight) 50%,transparent);
+  --glass-1:rgba(255,255,255,.34);--glass-2:rgba(255,255,255,.52);--glass-clear:rgba(255,255,255,.26);--bar-solid:rgba(255,255,255,.88)}
+@media(prefers-color-scheme:dark){:root{--gl-a:62%;--gl-s:46%;--gl-w:38%;--gl-p:56%;--glass-1:rgba(40,40,42,.30);--glass-2:rgba(40,40,42,.46);--glass-clear:rgba(60,60,62,.14);--bar-solid:rgba(28,28,30,.88)}}
 body{background:
     radial-gradient(75vw 42vh at 6% -4%,color-mix(in srgb,var(--accent) var(--gl-a),transparent),transparent 72%),
     radial-gradient(60vw 40vh at 104% 34%,color-mix(in srgb,var(--success) var(--gl-s),transparent),transparent 72%),
     radial-gradient(70vw 42vh at -4% 82%,color-mix(in srgb,var(--warning) var(--gl-w),transparent),transparent 72%),
     radial-gradient(70vw 36vh at 100% 100%,color-mix(in srgb,var(--accent-pressed) var(--gl-p),transparent),transparent 72%),
+    radial-gradient(46vw 24vh at 92% 58%,color-mix(in srgb,var(--accent) var(--gl-s),transparent),transparent 72%),
+    radial-gradient(44vw 22vh at 4% 52%,color-mix(in srgb,var(--accent-pressed) var(--gl-w),transparent),transparent 72%),
     var(--canvas);background-attachment:fixed}
 /* cabecera flotante */
 .top-sticky{padding:max(12px,env(safe-area-inset-top)) 12px 0}
-.topbar{border:1px solid var(--glass-edge);border-radius:var(--radius-xl);background:linear-gradient(150deg,var(--sheen),transparent 55%),var(--surface);-webkit-backdrop-filter:blur(var(--blur-lg)) saturate(160%);backdrop-filter:blur(var(--blur-lg)) saturate(160%);box-shadow:var(--shadow-glass-md),inset 0 1px 0 var(--glass-highlight)}
+.topbar{border:1px solid var(--glass-edge);border-radius:var(--radius-xl);background:linear-gradient(150deg,var(--sheen),transparent 55%),var(--glass-1);-webkit-backdrop-filter:blur(var(--blur-lg)) saturate(160%);backdrop-filter:blur(var(--blur-lg)) saturate(160%);box-shadow:var(--shadow-glass-md),inset 0 1px 0 var(--glass-highlight)}
 .net-banner{margin-top:8px;border:1px solid color-mix(in srgb,var(--danger) 40%,transparent);border-radius:var(--radius-md);-webkit-backdrop-filter:blur(var(--blur-md));backdrop-filter:blur(var(--blur-md))}
 .sync-dot[data-s=ok]{box-shadow:0 0 0 3px color-mix(in srgb,var(--success) 25%,transparent),0 0 12px color-mix(in srgb,var(--success) 80%,transparent)}
 .sync-dot[data-s=off]{box-shadow:0 0 0 3px color-mix(in srgb,var(--danger) 25%,transparent),0 0 12px color-mix(in srgb,var(--danger) 70%,transparent)}
 /* tarjetas */
-.card.ag-card{border-radius:var(--radius-xl);background:linear-gradient(150deg,var(--sheen),transparent 45%),var(--surface);-webkit-backdrop-filter:blur(var(--blur-lg)) saturate(160%);backdrop-filter:blur(var(--blur-lg)) saturate(160%);box-shadow:var(--shadow-glass-lg),inset 0 1px 0 var(--glass-highlight)}
-.ag-input{background:var(--surface-clear)}
+.card.ag-card{--ink-secondary:color-mix(in srgb,var(--ink-secondary) 80%,var(--ink));border-radius:var(--radius-xl);background:linear-gradient(150deg,var(--sheen),transparent 45%),var(--glass-1);-webkit-backdrop-filter:blur(var(--blur-lg)) saturate(190%);backdrop-filter:blur(var(--blur-lg)) saturate(190%);box-shadow:var(--shadow-glass-lg),inset 0 1px 0 var(--glass-highlight)}
+.ag-input{background:var(--glass-clear)}
+.card .ag-btn--glass,.card .cls-chip,.card .planbar,.card .choice{--surface-clear:var(--glass-clear)}
 /* botones */
 .ag-btn--primary{border-color:rgba(255,255,255,.35);background:linear-gradient(180deg,color-mix(in srgb,var(--accent) 78%,#fff),var(--accent) 55%,var(--accent-pressed));box-shadow:0 10px 28px color-mix(in srgb,var(--accent) 35%,transparent),inset 0 1px 0 rgba(255,255,255,.6)}
 .ag-btn--glass{background:var(--surface-clear);color:var(--accent);border-color:var(--glass-edge);box-shadow:inset 0 1px 0 var(--glass-highlight)}
@@ -327,10 +331,10 @@ body{background:
 /* botón flotante */
 .fab{border-color:rgba(255,255,255,.4);background:linear-gradient(180deg,color-mix(in srgb,var(--accent) 80%,#fff),var(--accent) 55%,var(--accent-pressed));-webkit-backdrop-filter:blur(16px);backdrop-filter:blur(16px);box-shadow:var(--shadow-glass-md),0 0 24px color-mix(in srgb,var(--accent) 30%,transparent),inset 0 1px 0 rgba(255,255,255,.6)}
 /* ventanas flotantes: cristal con el fondo desenfocado detrás */
-dialog{background:linear-gradient(150deg,var(--sheen),transparent 45%),var(--surface-strong);-webkit-backdrop-filter:blur(var(--blur-lg)) saturate(160%);backdrop-filter:blur(var(--blur-lg)) saturate(160%);border-radius:var(--radius-xl);box-shadow:var(--shadow-glass-lg),inset 0 1px 0 var(--glass-highlight)}
-dialog::backdrop{background:rgba(0,0,0,.42);-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px)}
-#plan-dialog,#report-dialog{background:linear-gradient(150deg,var(--sheen),transparent 45%),var(--surface-strong)}
+dialog{--ink-secondary:color-mix(in srgb,var(--ink-secondary) 80%,var(--ink));background:linear-gradient(150deg,var(--sheen),transparent 45%),var(--glass-2);-webkit-backdrop-filter:blur(var(--blur-lg)) saturate(190%);backdrop-filter:blur(var(--blur-lg)) saturate(190%);border-radius:var(--radius-xl);box-shadow:var(--shadow-glass-lg),inset 0 1px 0 var(--glass-highlight)}
+dialog::backdrop{background:rgba(0,0,0,.34);-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px)}
+#plan-dialog,#report-dialog{background:linear-gradient(150deg,var(--sheen),transparent 45%),var(--glass-2)}
 #plan-dialog .row,#report-dialog .row{bottom:calc(-1*var(--space-6))}
 @media(max-width:380px){#plan-dialog .row,#report-dialog .row{bottom:calc(-1*var(--space-4))}}
-#plan-dialog .pd-head,#report-dialog .pd-head,#plan-dialog .row,#report-dialog .row{background:color-mix(in srgb,var(--canvas-raised) 84%,transparent);-webkit-backdrop-filter:blur(var(--blur-md));backdrop-filter:blur(var(--blur-md))}
+#plan-dialog .pd-head,#report-dialog .pd-head,#plan-dialog .row,#report-dialog .row{background:var(--bar-solid);-webkit-backdrop-filter:blur(var(--blur-lg));backdrop-filter:blur(var(--blur-lg))}
 .toast{-webkit-backdrop-filter:blur(var(--blur-lg));backdrop-filter:blur(var(--blur-lg))}
