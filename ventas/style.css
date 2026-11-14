@@ -357,3 +357,37 @@ dialog::backdrop{background:rgba(0,0,0,.34);-webkit-backdrop-filter:blur(8px);ba
 #models-ai textarea[hidden],#models-ai .ag-btn[hidden],#models-ai ul[hidden],#models-ai p[hidden]{display:none}
 #models-clear{max-width:100%;white-space:normal}
 @media(min-width:640px){.models li{grid-template-columns:minmax(0,1fr) auto auto;align-items:center}.models .m-btns{order:3}.models .m-sel{grid-column:auto;order:2;grid-template-columns:repeat(2,150px)}}
+
+/* Responsividad: ventas, objetivos y cuenta */
+.pill{height:40px;min-width:40px}
+.del{width:36px;height:36px}
+/* tablas: nada se sale de su tarjeta */
+#by-model,#history,#unit-table{max-width:100%}
+@media(max-width:420px){
+  #sales,#sales tbody{display:block}
+  #sales thead{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+  #sales tr{display:grid;grid-template-columns:auto minmax(0,1fr) auto auto;grid-template-areas:"d m u x" ". g u x";column-gap:var(--space-2);align-items:center;padding:var(--space-2) 0;border-bottom:1px solid var(--glass-edge)}
+  #sales tbody tr:last-child{border-bottom:none}
+  #sales td{display:block;padding:var(--space-1) 0;border:none;min-width:0}
+  #sales td:nth-child(1){grid-area:d}
+  #sales td:nth-child(2){grid-area:m}
+  #sales td:nth-child(3){grid-area:g;padding-top:0}
+  #sales td:nth-child(4){grid-area:u;padding:0 var(--space-1)}
+  #sales td:nth-child(5){grid-area:x;padding:0;display:flex;align-items:center}
+  #sales td.empty,#sales td[colspan]{grid-column:1/-1}
+  #by-model th,#by-model td,#history th,#history td{padding:var(--space-2) var(--space-1)}
+}
+/* objetivos: cifras de «Hasta…» en columna única en pantallas estrechas */
+.gama{min-width:0;overflow-wrap:anywhere}
+@media(max-width:400px){
+  .miss{flex-direction:column;gap:var(--space-1)}
+  .big{font-size:30px}
+}
+/* cuenta y copia de seguridad: botones con separación y varias filas */
+section.card:has(#logout){display:flex;flex-wrap:wrap;gap:var(--space-2)}
+section.card:has(#logout)>h2,section.card:has(#logout)>p,section.card:has(#logout)>details{flex:1 1 100%;margin-top:0;margin-bottom:0}
+section.card:has(#logout)>.ag-btn{flex:1 1 auto;white-space:nowrap;margin:0;min-height:44px;display:inline-flex;align-items:center;justify-content:center;text-align:center;box-sizing:border-box}
+section.card:has(#logout)>.file{margin:0}
+.pwbox{margin:var(--space-2) 0}
+.bar>b span{white-space:nowrap}
+.miss strong{white-space:nowrap}
