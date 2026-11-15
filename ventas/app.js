@@ -929,32 +929,110 @@ function setStatus(text, s = '') {
   lastStatus = [text, s];
   if (!netOnline) { text = 'Sin internet: los cambios se guardan en este dispositivo'; s = 'off'; }   // sin internet manda el rojo, pase lo que pase con la nube
   $('sync').textContent = text; $('sync-dot').dataset.s = s; $('sync-dot').title = text;
+  updateAcct();
 }
-const traducir = m => /invalid login/i.test(m) ? 'Correo o contraseña incorrectos. Si ya creaste la cuenta, usa los mismos datos de siempre (pulsa “Ver” para comprobar la contraseña).'
+// Tarjeta de cuenta: correo activo y botones de salir solo si hay sesión (en modo sin nube no se muestra nada roto)
+function updateAcct() {
+  const on = !!(sb && session && session.user);
+  $('acct').hidden = !on || !session.user.email; $('acct-email').textContent = on ? (session.user.email || '') : '';
+  $('logout').hidden = $('switch-acct').hidden = !on;
+}
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
+const MSG_EMAIL = 'El correo no parece válido. Revisa que tenga el formato nombre@ejemplo.com.';
+const MSG_SHORT = 'La contraseña debe tener al menos 8 caracteres.';
+const MSG_NET = 'Sin conexión: comprueba tu internet y vuelve a intentarlo.';
+const MSG_RATE = 'Demasiados intentos: espera unos minutos y prueba otra vez.';
+// Traduce un error de Supabase (mensaje + estado HTTP) a un texto claro; el de credenciales es genérico a propósito
+const traducir = (m, st) => { m = String(m || '');
+  return /invalid login|invalid credentials/i.test(m) ? 'Correo o contraseña incorrectos. Si ya creaste la cuenta, usa los mismos datos de siempre (pulsa “Ver” para comprobar la contraseña).'
   : /not confirmed/i.test(m) ? 'Falta confirmar el correo: abre el enlace que te hemos enviado.'
-  : /already registered|registro cerrado|database error/i.test(m) ? 'Ya existe una cuenta con ese correo. Pulsa “Entrar” con tu correo y contraseña de siempre.'
-  : /password/i.test(m) ? 'La contraseña debe tener al menos 8 caracteres.'
-  : /rate limit|too many/i.test(m) ? 'Demasiados intentos: espera unos minutos y prueba otra vez.'
-  : 'No se pudo completar. Comprueba la conexión y vuelve a intentarlo.';
+  : /already registered|already been registered|already exists|registro cerrado|database error/i.test(m) ? 'Ya existe una cuenta con ese correo. Pulsa “Entrar” con tu correo y contraseña de siempre.'
+  : /failed to fetch|networkerror|network request|load failed|fetch failed/i.test(m) || st === 0 ? MSG_NET
+  : /rate limit|too many|security purposes|over_\w*_?limit/i.test(m) || st === 429 ? MSG_RATE
+  : /weak|pwned|easy to guess|compromised|breach|known to be/i.test(m) ? 'Esa contraseña es demasiado débil o aparece en filtraciones de datos. Elige otra más larga y poco habitual.'
+  : /different from the old|same as the old|should be different/i.test(m) ? 'Elige una contraseña distinta a la actual.'
+  : /at least \d+ char|too short|password should/i.test(m) ? MSG_SHORT
+  : /unable to validate email|invalid format|invalid email|email address.*invalid|is invalid/i.test(m) ? MSG_EMAIL
+  : /session missing|not authenticated|jwt/i.test(m) ? 'El enlace ha caducado. Pide uno nuevo con «¿Has olvidado la contraseña?».'
+  : 'No se pudo completar. Comprueba la conexión y vuelve a intentarlo.'; };
 
+let authDone = null, authBound = false, recoveryP = null, recoveryInit = false;   // authDone: resuelve el askLogin pendiente
+const hashRecovery = /type=recovery/.test(location.hash);                          // se abrió desde el enlace del correo
+const eyeToggle = (btn, inp) => btn.onclick = () => { const show = inp.type === 'password'; inp.type = show ? 'text' : 'password'; btn.textContent = show ? 'Ocultar' : 'Ver'; btn.setAttribute('aria-pressed', String(show)); };
+// Alterna entre el formulario de entrar y el de contraseña nueva dentro del mismo diálogo
+function authView(rec) {
+  $('auth-form').hidden = rec; $('recover-form').hidden = !rec;
+  $('auth-dialog').setAttribute('aria-labelledby', rec ? 'rec-title' : 'auth-title');
+}
+function bindAuth() {
+  if (authBound) return; authBound = true;
+  const dlg = $('auth-dialog'), form = $('auth-form'), msg = $('auth-msg'), info = $('auth-info');
+  const busy = (f, on) => f.querySelectorAll('button').forEach(b => b.disabled = on);
+  const err = (t, focusEl) => { info.hidden = true; msg.textContent = t; msg.hidden = false; if (focusEl) focusEl.focus(); };
+  dlg.addEventListener('cancel', e => e.preventDefault());
+  eyeToggle($('auth-eye'), $('auth-pass')); eyeToggle($('rec-eye'), $('rec-pass'));
+  form.onsubmit = async e => {
+    e.preventDefault();
+    const kind = (e.submitter && e.submitter.value) || 'login', email = $('auth-email').value.trim(), password = $('auth-pass').value;
+    msg.hidden = true; info.hidden = true;
+    if (!EMAIL_RE.test(email)) return err(email ? MSG_EMAIL : 'Escribe tu correo.', $('auth-email'));
+    if (!password) return err('Escribe tu contraseña.', $('auth-pass'));
+    if (kind === 'signup' && password.length < 8) return err(MSG_SHORT, $('auth-pass'));   // se comprueba aquí: ni se llama a Supabase
+    busy(form, true);
+    let r;
+    try { r = kind === 'signup' ? await sb.auth.signUp({ email, password }) : await sb.auth.signInWithPassword({ email, password }); }
+    catch (x) { r = { error: { message: String(x && x.message || x), status: 0 } }; }
+    busy(form, false);
+    if (r.error) return err(traducir(r.error.message, r.error.status));
+    if (!r.data.session) { info.textContent = 'Te hemos enviado un correo: confirma y vuelve a pulsar “Entrar”.'; info.hidden = false; return; }
+    session = r.data.session; updateAcct(); dlg.close(); const d = authDone; authDone = null; if (d) d();
+  };
+  // Recuperar contraseña: mismo mensaje exista o no la cuenta (no se revela qué correos están registrados)
+  $('auth-forgot').onclick = async () => {
+    const email = $('auth-email').value.trim(); msg.hidden = true; info.hidden = true;
+    if (!EMAIL_RE.test(email)) return err(email ? MSG_EMAIL : 'Escribe tu correo arriba y vuelve a pulsar «¿Has olvidado la contraseña?».', $('auth-email'));
+    busy(form, true); $('auth-forgot').disabled = true;
+    let r;
+    try { r = await sb.auth.resetPasswordForEmail(email, { redirectTo: location.origin + '/' }); }
+    catch (x) { r = { error: { message: String(x && x.message || x), status: 0 } }; }
+    busy(form, false); $('auth-forgot').disabled = false;
+    if (r.error) { const t = traducir(r.error.message, r.error.status); return err(/^No se pudo completar/.test(t) ? 'No se pudo enviar el enlace. Inténtalo de nuevo en un momento.' : t); }
+    info.textContent = 'Si existe una cuenta con ese correo, te hemos enviado un enlace para crear una contraseña nueva. Revisa también la carpeta de spam.'; info.hidden = false;
+  };
+}
 function askLogin(notice) {
   return new Promise(resolve => {
     const dlg = $('auth-dialog'), msg = $('auth-msg');
+    bindAuth(); authDone = resolve; authView(false); $('auth-info').hidden = true;
     if (notice) { msg.textContent = notice; msg.hidden = false; }
-    dlg.addEventListener('cancel', e => e.preventDefault());
-    $('auth-eye').onclick = () => { const p = $('auth-pass'), show = p.type === 'password'; p.type = show ? 'text' : 'password'; $('auth-eye').textContent = show ? 'Ocultar' : 'Ver'; $('auth-eye').setAttribute('aria-pressed', String(show)); };
-    $('auth-form').onsubmit = async e => {
-      e.preventDefault();
-      const kind = (e.submitter && e.submitter.value) || 'login', email = $('auth-email').value.trim(), password = $('auth-pass').value;
-      msg.hidden = true; $('auth-form').querySelectorAll('button').forEach(b => b.disabled = true);
-      const { data, error } = kind === 'signup' ? await sb.auth.signUp({ email, password }) : await sb.auth.signInWithPassword({ email, password });
-      $('auth-form').querySelectorAll('button').forEach(b => b.disabled = false);
-      if (error) { msg.textContent = traducir(error.message); msg.hidden = false; return; }
-      if (!data.session) { msg.textContent = 'Te hemos enviado un correo: confirma y vuelve a pulsar “Entrar”.'; msg.hidden = false; return; }
-      session = data.session; dlg.close(); resolve();
-    };
-    dlg.showModal();
+    if (!dlg.open) dlg.showModal();
+    $('auth-email').focus();
   });
+}
+// Vuelta desde el enlace del correo: formulario de contraseña nueva (la sesión ya la ha creado Supabase). Devuelve una promesa que acaba al guardarla.
+function askNewPassword() {
+  if (recoveryP) return recoveryP;
+  recoveryP = new Promise(resolve => {
+    bindAuth();
+    const dlg = $('auth-dialog'), form = $('recover-form'), msg = $('rec-msg');
+    $('rec-email').textContent = (session && session.user && session.user.email) || ''; $('rec-pass').value = ''; msg.hidden = true;
+    authView(true); if (!dlg.open) dlg.showModal(); $('rec-pass').focus();
+    form.onsubmit = async e => {
+      e.preventDefault();
+      const password = $('rec-pass').value; msg.hidden = true;
+      if (password.length < 8) { msg.textContent = MSG_SHORT; msg.hidden = false; $('rec-pass').focus(); return; }
+      form.querySelectorAll('button').forEach(b => b.disabled = true);
+      let r;
+      try { r = await sb.auth.updateUser({ password }); } catch (x) { r = { error: { message: String(x && x.message || x), status: 0 } }; }
+      form.querySelectorAll('button').forEach(b => b.disabled = false);
+      if (r.error) { msg.textContent = traducir(r.error.message, r.error.status); msg.hidden = false; $('rec-pass').focus(); return; }
+      $('rec-pass').value = ''; authView(false); dlg.close();
+      try { history.replaceState(null, '', location.pathname + location.search); } catch (x) {}   // quita el código del enlace de la barra
+      showToast('Contraseña cambiada. Úsala la próxima vez que entres.', null);
+      resolve();
+    };
+  }).finally(() => { recoveryP = null; });
+  return recoveryP;
 }
 // Clasifica un error de Supabase: 'net' sin red, 'auth' sesión no válida, 'conflict' otro dispositivo guardó antes, 'other' el resto
 function classify(err) {
@@ -1041,14 +1119,24 @@ async function push(retried) {
   if (dirty) schedulePush(); else clearPending();
 }
 async function initCloud() {
-  if (!CFG || !window.supabase) { ready = true; checkNewMonth(); return; }
+  if (!CFG || !window.supabase) { setStatus('Solo en este dispositivo'); ready = true; checkNewMonth(); return; }
   sb = window.supabase.createClient(CFG.url, CFG.key, { auth: { persistSession: true, autoRefreshToken: true } });
   session = (await sb.auth.getSession()).data.session;
-  const hadSession = !!session;
+  const hadSession = !!session && !hashRecovery;   // la sesión del enlace del correo no cuenta como «sesión previa»
   // sesión que se pierde sin que el usuario cierre sesión (caducada, revocada, contraseña cambiada en otro sitio)
-  sb.auth.onAuthStateChange((ev, s) => { session = s; if (ev === 'SIGNED_OUT' && !loggingOut) sessionExpired(); });
-  if (!session) { identifying = false; await askLogin(); }   // con el formulario abierto el estado sigue vacío: no se muestra nada de nadie
-  identifying = false;
+  sb.auth.onAuthStateChange((ev, s) => {
+    session = s; updateAcct();
+    if (ev === 'SIGNED_OUT' && !loggingOut) sessionExpired();
+    if (ev === 'PASSWORD_RECOVERY' && s && !recoveryInit) {
+      askNewPassword().then(() => {
+        if (authDone) { const d = authDone; authDone = null; d(); }          // el formulario de entrar esperaba: ya hay sesión
+        else if (ready) { claimLocal(true); render(); if (hasPending()) push(); else pull(); }
+      });
+    }
+  });
+  if (session && hashRecovery) { recoveryInit = true; identifying = false; await askNewPassword(); }
+  if (!session) { identifying = false; setStatus('Sin sesión'); await askLogin(); }   // con el formulario abierto el estado sigue vacío: no se muestra nada de nadie
+  identifying = false; recoveryInit = false;
   claimLocal(hadSession);
   if (hasPending()) await push(); else await pull();   // cambios hechos sin internet: primero se suben
   ready = true; render(); checkNewMonth(); offerBackup();
@@ -1072,16 +1160,20 @@ $('pw-form').onsubmit = async e => {
   if (error) return say(/different|same/i.test(error.message) ? 'Elige una contraseña distinta a la actual.' : /weak|short|at least/i.test(error.message) ? 'Esa contraseña es demasiado débil: usa una más larga.' : 'No se pudo cambiar. Cierra sesión, vuelve a entrar e inténtalo otra vez.', false);
   $('pw-new').value = ''; say('Contraseña cambiada. Úsala la próxima vez que entres.', true);
 };
-$('logout').onclick = async () => {
+// Cerrar sesión (también «Cambiar de cuenta»): sube lo pendiente, avisa si algo se perdería y borra las claves locales.
+// Al recargar no hay sesión, así que la app abre directamente el formulario de entrar.
+async function leaveAccount(switching) {
   if (!sb) return;
   // primero se intentan subir los cambios pendientes; si no se puede (sin conexión), se avisa de que se perderían
   for (let i = 0; i < 100 && pushing; i++) await new Promise(r => setTimeout(r, 100));
   if (hasPending()) await push();
   const pend = hasPending() || pushing || hasBackup();
-  if (!confirm(pend ? 'Hay cambios sin subir a la nube (por ejemplo, hechos sin internet). Si cierras sesión ahora se perderán en este dispositivo. ¿Cerrar sesión igualmente?' : '¿Cerrar sesión en este dispositivo?')) return;
+  if (!confirm(pend ? 'Hay cambios sin subir a la nube (por ejemplo, hechos sin internet). Si cierras sesión ahora se perderán en este dispositivo. ¿' + (switching ? 'Cambiar de cuenta' : 'Cerrar sesión') + ' igualmente?' : switching ? '¿Cambiar de cuenta? Se cerrará la sesión en este dispositivo y podrás entrar con otro correo.' : '¿Cerrar sesión en este dispositivo?')) return;
   clearTimeout(pushTimer); dirty = false; loggingOut = true;   // cierre voluntario: no es «sesión caducada»
   await sb.auth.signOut(); wipeLocal(); location.reload();
-};
+}
+$('logout').onclick = () => leaveAccount(false);
+$('switch-acct').onclick = () => leaveAccount(true);
 
 // ---------- conexión a internet: se comprueba cada pocos segundos y al instante cuando el móvil avisa ----------
 // navigator.onLine solo dice si hay red (wifi), no si hay internet: por eso además se hace una petición real a un servidor externo.

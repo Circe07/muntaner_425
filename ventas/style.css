@@ -105,7 +105,11 @@ dialog{max-width:560px;max-height:92vh;overflow:auto}
 .sync-dot{width:8px;height:8px;border-radius:50%;background:var(--ink-tertiary);flex:none;margin-right:auto}
 .sync-dot[data-s=ok]{background:var(--success)}.sync-dot[data-s=busy]{background:var(--accent)}.sync-dot[data-s=off]{background:var(--danger)}
 #auth-dialog{max-width:380px}#auth-dialog .ag-hint[hidden]{display:none}
-#logout{margin-left:var(--space-2)}
+#logout,#switch-acct{margin-left:var(--space-2)}
+.acct strong,.acct-email{overflow-wrap:anywhere;color:var(--ink)}
+.ok-msg{color:var(--success);margin:0}
+.linkbtn{background:none;border:0;color:var(--accent);font:inherit;font-size:13px;text-decoration:underline;min-height:44px;padding:0 var(--space-1,4px);cursor:pointer;align-self:flex-start;text-align:left}
+.linkbtn:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:var(--radius-sm,6px)}
 
 /* ---- Ajuste móvil: nada debe ensanchar la página ---- */
 html,body{max-width:100%}html{overflow-x:hidden}body{overflow-x:hidden;overflow-x:clip}   /* clip no crea un contenedor de scroll: así la cabecera sticky sí se queda fija */
