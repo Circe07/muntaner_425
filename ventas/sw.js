@@ -5,7 +5,7 @@
 //   segundo plano. Todos llevan ?v=NN en la página, así una versión nueva nunca mezcla archivos viejos y nuevos.
 // - Supabase y la comprobación de conexión (?ping) van siempre directos a la red.
 // AL PUBLICAR: subir V aquí y el mismo ?v=NN en index.html.
-const V = '26', CACHE = 'ventas-shell-v' + V;
+const V = '27', CACHE = 'ventas-shell-v' + V;
 const ASSETS = ['tokens.css', 'bundle.css', 'style.css', 'config.js', 'vendor/supabase.js', 'plan.js', 'report.js', 'app.js'].map(f => f + '?v=' + V);
 const SHELL = ['./', 'index.html', ...ASSETS, 'fonts/plus-jakarta-sans-latin.woff2', 'icons/noise.png', 'manifest.webmanifest', 'favicon.svg', 'icons/icon-192.png'];
 self.addEventListener('install', e => { e.waitUntil(caches.open(CACHE).then(c => c.addAll(SHELL)).then(() => self.skipWaiting())); });

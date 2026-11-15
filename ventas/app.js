@@ -33,6 +33,9 @@ const freshState = () => ({ models: [], sales: [], goals: {}, plans: {}, setting
 const seedNames = new Set(SEED.map(([n]) => n.trim().toLowerCase()));
 const isSeedName = n => seedNames.has(String(n).trim().toLowerCase());
 const nowMonth = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`; };
+// Con cuenta en la nube, hasta saber QUIÉN entra (initCloud/claimLocal) los datos locales no se pintan (primer render con
+// estado vacío), no se pisan al guardar y, si son de otra persona, se descartan: nunca se muestran ni se suben.
+let identifying = !!(window.SUPABASE_CONFIG && window.supabase);
 let state = load();
 let month = currentKey();
 
@@ -115,7 +118,8 @@ function migrate(s) {
   s.seedVersion = 10;
   return s;
 }
-function persistLocal() { try { localStorage.setItem(KEY, JSON.stringify(state)); } catch (e) { alert('No se pudo guardar en el navegador.'); } }
+function persistLocal() { if (identifying) return;   // aún no se sabe de quién son los datos locales: no se pisan
+  try { localStorage.setItem(KEY, JSON.stringify(state)); if (session) localStorage.setItem(OWNERKEY, session.user.id); } catch (e) { alert('No se pudo guardar en el navegador.'); } }
 function save() { resetMemos(); persistLocal(); schedulePush(); }
 
 // ---------- planes de objetivos (el cálculo vive en plan.js) ----------
@@ -813,7 +817,8 @@ $('import').onchange = async e => {
   e.target.value = '';
 };
 
-setDefaultDate(); render();
+setDefaultDate();
+if (identifying) { const own = state; state = freshState(); render(); state = own; } else render();   // sin identificar no se pinta nada de nadie
 
 // ---------- reporte del día (para pegar en WhatsApp) ----------
 function typeOfSale(s, ym) {
@@ -896,9 +901,22 @@ $('rp-wa').addEventListener('click', e => { if ($('rp-wa').getAttribute('aria-di
 // ---------- Cuenta y sincronización (Supabase) ----------
 const CFG = window.SUPABASE_CONFIG;
 let sb = null, session = null, pushTimer = null, pushing = false, dirty = false;
-const REVKEY = KEY + '-rev';
-let rev = 0; try { rev = parseInt(localStorage.getItem(REVKEY), 10) || 0; } catch (e) {}        // la versión de la nube se recuerda: así lo que se edita sin internet se puede subir luego
+const REVKEY = KEY + '-rev', OWNERKEY = KEY + '-owner';
+let rev = 0;        // versión de la nube DE ESTA CUENTA (se recuerda en REVKEY; claimLocal la lee solo si los datos locales son de quien entra)
 const saveRev = () => { try { localStorage.setItem(REVKEY, String(rev)); } catch (e) {} };
+const wipeLocal = () => { try { localStorage.removeItem(KEY); localStorage.removeItem(REVKEY); localStorage.removeItem(OWNERKEY); } catch (e) {} };   // todas las claves locales de la cuenta
+const emptyData = s => !s || !s.models || (!s.models.length && !(s.sales || []).length);
+// Decide de quién son los datos guardados en este dispositivo y carga solo los de quien ha entrado.
+// Datos sin dueño (instalaciones anteriores): son de quien entra con la sesión ya guardada; si entra alguien sin sesión previa, se tratan como ajenos salvo que estén vacíos.
+function claimLocal(hadSession) {
+  const me = session.user.id; let owner = null, raw = null;
+  try { owner = localStorage.getItem(OWNERKEY); raw = JSON.parse(localStorage.getItem(KEY)); } catch (e) {}
+  if (!owner && (hadSession || emptyData(raw))) owner = me;
+  if (owner === me) { state = load(); try { rev = parseInt(localStorage.getItem(REVKEY), 10) || 0; } catch (e) { rev = 0; } }
+  else { wipeLocal(); state = freshState(); rev = 0; dirty = false; clearTimeout(pushTimer); }   // datos de otra persona: nunca se muestran ni se suben
+  try { localStorage.setItem(OWNERKEY, me); } catch (e) {}
+  resetMemos();
+}
 let lastStatus = ['', ''], netOnline = navigator.onLine, netKnown = false;
 function setStatus(text, s = '') {
   lastStatus = [text, s];
@@ -956,8 +974,11 @@ async function initCloud() {
   if (!CFG || !window.supabase) { ready = true; checkNewMonth(); return; }
   sb = window.supabase.createClient(CFG.url, CFG.key, { auth: { persistSession: true, autoRefreshToken: true } });
   session = (await sb.auth.getSession()).data.session;
+  const hadSession = !!session;
   sb.auth.onAuthStateChange((_e, s) => { session = s; });
-  if (!session) await askLogin();
+  if (!session) { identifying = false; await askLogin(); }   // con el formulario abierto el estado sigue vacío: no se muestra nada de nadie
+  identifying = false;
+  claimLocal(hadSession);
   await pull();
   ready = true; render(); checkNewMonth();
 }
@@ -981,8 +1002,14 @@ $('pw-form').onsubmit = async e => {
   $('pw-new').value = ''; say('Contraseña cambiada. Úsala la próxima vez que entres.', true);
 };
 $('logout').onclick = async () => {
-  if (!sb || !confirm('¿Cerrar sesión en este dispositivo?')) return;
-  await sb.auth.signOut(); try { localStorage.removeItem(KEY); localStorage.removeItem(REVKEY); } catch (e) {} location.reload();
+  if (!sb) return;
+  // primero se intentan subir los cambios pendientes; si no se puede (sin conexión), se avisa de que se perderían
+  for (let i = 0; i < 100 && pushing; i++) await new Promise(r => setTimeout(r, 100));
+  if (dirty) await push();
+  const pend = dirty || pushing;
+  if (!confirm(pend ? 'Hay cambios sin subir a la nube (por ejemplo, hechos sin internet). Si cierras sesión ahora se perderán en este dispositivo. ¿Cerrar sesión igualmente?' : '¿Cerrar sesión en este dispositivo?')) return;
+  clearTimeout(pushTimer); dirty = false;
+  await sb.auth.signOut(); wipeLocal(); location.reload();
 };
 
 // ---------- conexión a internet: se comprueba cada pocos segundos y al instante cuando el móvil avisa ----------
