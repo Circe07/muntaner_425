@@ -940,6 +940,13 @@ function updateAcct() {
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
 const MSG_EMAIL = 'El correo no parece válido. Revisa que tenga el formato nombre@ejemplo.com.';
 const MSG_SHORT = 'La contraseña debe tener al menos 8 caracteres.';
+// Misma regla que exige Supabase (Auth → contraseñas): 8+ caracteres con minúscula, mayúscula, número y símbolo
+const MSG_PW = 'La contraseña necesita al menos 8 caracteres y tener minúscula, mayúscula, número y símbolo (por ejemplo: Ventas.2026).';
+const pwProblem = pw => { pw = String(pw || ''); const faltan = [];
+  if (!/[a-z]/.test(pw)) faltan.push('una minúscula'); if (!/[A-Z]/.test(pw)) faltan.push('una mayúscula');
+  if (!/[0-9]/.test(pw)) faltan.push('un número'); if (!/[!@#$%^&*()_+\-=\[\]{};'\\:"|<>?,.\/`~]/.test(pw)) faltan.push('un símbolo (por ejemplo . ! ? @ #)');
+  if (pw.length < 8) return faltan.length ? MSG_PW : MSG_SHORT;
+  return faltan.length ? 'A la contraseña le falta ' + (faltan.length > 1 ? faltan.slice(0, -1).join(', ') + ' y ' + faltan[faltan.length - 1] : faltan[0]) + '. Ejemplo válido: Ventas.2026' : ''; };
 const MSG_NET = 'Sin conexión: comprueba tu internet y vuelve a intentarlo.';
 const MSG_RATE = 'Demasiados intentos: espera unos minutos y prueba otra vez.';
 // Traduce un error de Supabase (mensaje + estado HTTP) a un texto claro; el de credenciales es genérico a propósito
@@ -951,6 +958,7 @@ const traducir = (m, st) => { m = String(m || '');
   : /rate limit|too many|security purposes|over_\w*_?limit/i.test(m) || st === 429 ? MSG_RATE
   : /weak|pwned|easy to guess|compromised|breach|known to be/i.test(m) ? 'Esa contraseña es demasiado débil o aparece en filtraciones de datos. Elige otra más larga y poco habitual.'
   : /different from the old|same as the old|should be different/i.test(m) ? 'Elige una contraseña distinta a la actual.'
+  : /one character of each|should contain|must contain/i.test(m) ? MSG_PW
   : /at least \d+ char|too short|password should/i.test(m) ? MSG_SHORT
   : /unable to validate email|invalid format|invalid email|email address.*invalid|is invalid/i.test(m) ? MSG_EMAIL
   : /session missing|not authenticated|jwt/i.test(m) ? 'El enlace ha caducado. Pide uno nuevo con «¿Has olvidado la contraseña?».'
@@ -977,7 +985,7 @@ function bindAuth() {
     msg.hidden = true; info.hidden = true;
     if (!EMAIL_RE.test(email)) return err(email ? MSG_EMAIL : 'Escribe tu correo.', $('auth-email'));
     if (!password) return err('Escribe tu contraseña.', $('auth-pass'));
-    if (kind === 'signup' && password.length < 8) return err(MSG_SHORT, $('auth-pass'));   // se comprueba aquí: ni se llama a Supabase
+    if (kind === 'signup' && pwProblem(password)) return err(pwProblem(password), $('auth-pass'));   // se comprueba aquí: ni se llama a Supabase
     busy(form, true);
     let r;
     try { r = kind === 'signup' ? await sb.auth.signUp({ email, password }) : await sb.auth.signInWithPassword({ email, password }); }
@@ -1020,7 +1028,7 @@ function askNewPassword() {
     form.onsubmit = async e => {
       e.preventDefault();
       const password = $('rec-pass').value; msg.hidden = true;
-      if (password.length < 8) { msg.textContent = MSG_SHORT; msg.hidden = false; $('rec-pass').focus(); return; }
+      if (pwProblem(password)) { msg.textContent = pwProblem(password); msg.hidden = false; $('rec-pass').focus(); return; }
       form.querySelectorAll('button').forEach(b => b.disabled = true);
       let r;
       try { r = await sb.auth.updateUser({ password }); } catch (x) { r = { error: { message: String(x && x.message || x), status: 0 } }; }
@@ -1153,7 +1161,7 @@ $('pw-form').onsubmit = async e => {
   const msg = $('pw-msg'), password = $('pw-new').value, btn = e.submitter;
   const say = (t, ok) => { msg.textContent = t; msg.hidden = false; msg.style.color = ok ? 'var(--success)' : 'var(--danger)'; };
   if (!sb || !session) return say('Primero inicia sesión.', false);
-  if (password.length < 8) return say('La contraseña debe tener al menos 8 caracteres.', false);
+  if (pwProblem(password)) return say(pwProblem(password), false);
   if (btn) btn.disabled = true;
   const { error } = await sb.auth.updateUser({ password });
   if (btn) btn.disabled = false;
