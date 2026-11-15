@@ -901,10 +901,17 @@ $('rp-wa').addEventListener('click', e => { if ($('rp-wa').getAttribute('aria-di
 // ---------- Cuenta y sincronización (Supabase) ----------
 const CFG = window.SUPABASE_CONFIG;
 let sb = null, session = null, pushTimer = null, pushing = false, dirty = false;
-const REVKEY = KEY + '-rev', OWNERKEY = KEY + '-owner';
+const REVKEY = KEY + '-rev', OWNERKEY = KEY + '-owner', PENDKEY = KEY + '-pending', BAKKEY = KEY + '-backup';
+let loggingOut = false, askingLogin = false;   // banderas: cierre de sesión voluntario / formulario de «sesión caducada» ya abierto
+// Cambios sin subir: la marca vive en localStorage para sobrevivir a un cierre o recarga de la app (sin ella, el pull los pisaría)
+const pendingFlag = () => { try { return localStorage.getItem(PENDKEY) === '1'; } catch (e) { return false; } };
+const markPending = () => { if (identifying || !window.SUPABASE_CONFIG) return; try { localStorage.setItem(PENDKEY, '1'); } catch (e) {} };
+const clearPending = () => { try { localStorage.removeItem(PENDKEY); } catch (e) {} };
+const hasPending = () => dirty || pendingFlag();
+const hasBackup = () => { try { return !!localStorage.getItem(BAKKEY); } catch (e) { return false; } };
 let rev = 0;        // versión de la nube DE ESTA CUENTA (se recuerda en REVKEY; claimLocal la lee solo si los datos locales son de quien entra)
 const saveRev = () => { try { localStorage.setItem(REVKEY, String(rev)); } catch (e) {} };
-const wipeLocal = () => { try { localStorage.removeItem(KEY); localStorage.removeItem(REVKEY); localStorage.removeItem(OWNERKEY); } catch (e) {} };   // todas las claves locales de la cuenta
+const wipeLocal = () => { try { localStorage.removeItem(KEY); localStorage.removeItem(REVKEY); localStorage.removeItem(OWNERKEY); localStorage.removeItem(PENDKEY); localStorage.removeItem(BAKKEY); } catch (e) {} };   // todas las claves locales de la cuenta
 const emptyData = s => !s || !s.models || (!s.models.length && !(s.sales || []).length);
 // Decide de quién son los datos guardados en este dispositivo y carga solo los de quien ha entrado.
 // Datos sin dueño (instalaciones anteriores): son de quien entra con la sesión ya guardada; si entra alguien sin sesión previa, se tratan como ajenos salvo que estén vacíos.
@@ -930,9 +937,10 @@ const traducir = m => /invalid login/i.test(m) ? 'Correo o contraseña incorrect
   : /rate limit|too many/i.test(m) ? 'Demasiados intentos: espera unos minutos y prueba otra vez.'
   : 'No se pudo completar. Comprueba la conexión y vuelve a intentarlo.';
 
-function askLogin() {
+function askLogin(notice) {
   return new Promise(resolve => {
     const dlg = $('auth-dialog'), msg = $('auth-msg');
+    if (notice) { msg.textContent = notice; msg.hidden = false; }
     dlg.addEventListener('cancel', e => e.preventDefault());
     $('auth-eye').onclick = () => { const p = $('auth-pass'), show = p.type === 'password'; p.type = show ? 'text' : 'password'; $('auth-eye').textContent = show ? 'Ocultar' : 'Ver'; $('auth-eye').setAttribute('aria-pressed', String(show)); };
     $('auth-form').onsubmit = async e => {
@@ -948,44 +956,107 @@ function askLogin() {
     dlg.showModal();
   });
 }
-async function pull() {
+// Clasifica un error de Supabase: 'net' sin red, 'auth' sesión no válida, 'conflict' otro dispositivo guardó antes, 'other' el resto
+function classify(err) {
+  const m = String(err.message || ''), st = err.status;
+  if (/duplicate|conflict/i.test(m) || st === 409) return 'conflict';
+  if (st === 0 || /failed to fetch|networkerror|load failed|network request failed/i.test(m)) return 'net';
+  if (st === 401 || st === 403 || err.code === 'PGRST301' || /jwt expired|invalid jwt|auth session missing/i.test(m)) return 'auth';
+  return 'other';
+}
+// Intenta renovar la sesión una vez: true = vale de nuevo, 'net' = no se pudo comprobar por falta de red, false = caducada
+async function refreshOk() {
+  try {
+    const { data, error } = await sb.auth.refreshSession();
+    if (!error && data && data.session) { session = data.session; return true; }
+    if (error && classify(error) === 'net') return 'net';
+  } catch (e) { if (e instanceof TypeError) return 'net'; }
+  return false;
+}
+const msgOffline = () => setStatus('Sin conexión: los cambios se guardan en este dispositivo', 'off');
+// Sesión caducada: se conservan los cambios locales como pendientes y se pide volver a entrar
+async function sessionExpired() {
+  if (askingLogin || loggingOut || identifying || $('auth-dialog').open) return;
+  askingLogin = true; clearTimeout(pushTimer);
+  try {
+    if (dirty) markPending();
+    setStatus('Sesión caducada: vuelve a entrar para guardar en la nube', 'off');
+    await askLogin('Tu sesión ha caducado. Vuelve a entrar para guardar tus cambios en la nube. Si entras con otra cuenta, los datos de este dispositivo no se mezclarán con los de esa cuenta.');
+    claimLocal(true);                       // misma cuenta: conserva lo pendiente; otra cuenta: aislamiento
+    render();
+    if (hasPending()) await push(); else await pull();
+  } finally { askingLogin = false; }
+}
+// Trata un fallo de red/sesión; devuelve true si conviene reintentar tras renovar la sesión
+async function onFail(err, retried) {
+  const k = classify(err);
+  if (k === 'auth') {
+    const ok = retried ? false : await refreshOk();
+    if (ok === true) return true;
+    if (ok === 'net') msgOffline(); else sessionExpired();
+    return false;
+  }
+  if (k === 'net') msgOffline(); else setStatus('No se pudo sincronizar: los cambios se guardan en este dispositivo', 'off');
+  return false;
+}
+async function pull(force, retried) {
+  if (!force && hasPending()) return push();   // lo local pendiente se sube antes de traer nada de la nube
   setStatus('Sincronizando…');
   const { data, error } = await sb.from('app_state').select('data,rev').maybeSingle();
-  if (error) { setStatus('Sin conexión: los cambios se guardan en este dispositivo', 'off'); return false; }
-  if (data) { state = migrate(data.data); rev = data.rev; saveRev(); persistLocal(); setStatus('Sincronizado', 'ok'); render(); return true; }
+  if (error) { if (await onFail(error, retried)) return pull(force, true); return false; }
+  if (data) { state = migrate(data.data); rev = data.rev; saveRev(); dirty = false; clearPending(); persistLocal(); setStatus('Sincronizado', 'ok'); render(); return true; }
   rev = 0; saveRev(); await push(); return true;   // primera vez: sube lo que hay en este dispositivo
 }
-function schedulePush() { if (!sb || !session) return; dirty = true; setStatus('Guardando…', 'busy'); clearTimeout(pushTimer); pushTimer = setTimeout(push, 700); }
-async function push() {
+function schedulePush() { dirty = true; markPending(); if (!sb || !session) return; setStatus('Guardando…', 'busy'); clearTimeout(pushTimer); pushTimer = setTimeout(() => push(), 700); }
+// Otro dispositivo guardó antes: se guarda una copia de lo local, se trae lo de la nube y se avisa con opción de recuperar
+async function conflict() {
+  try { localStorage.setItem(BAKKEY, JSON.stringify({ at: new Date().toISOString(), data: state })); } catch (e) {}
+  const ok = await pull(true);
+  if (ok) offerBackup();
+}
+function offerBackup() {
+  if (hasBackup()) showToast('Otro dispositivo guardó antes que tú. Se han traído sus datos y tus cambios están en una copia.', restoreBackup, 'Recuperar mis cambios', 20000);
+}
+function restoreBackup() {
+  let b = null; try { b = JSON.parse(localStorage.getItem(BAKKEY)); } catch (e) {}
+  if (!b || !b.data) return;
+  state = migrate(b.data); resetMemos(); persistLocal();
+  try { localStorage.removeItem(BAKKEY); } catch (e) {}
+  render(); schedulePush();               // la copia pasa a ser el estado actual y se sube
+}
+async function push(retried) {
   if (!sb || !session || pushing) return;
   clearTimeout(pushTimer); pushing = true; dirty = false;
   const row = { user_id: session.user.id, data: state, rev: rev + 1, updated_at: new Date().toISOString() };
   const r = rev === 0 ? await sb.from('app_state').insert(row).select('rev')
     : await sb.from('app_state').update(row).eq('user_id', session.user.id).eq('rev', rev).select('rev');
   pushing = false;
-  if (r.error || !r.data || !r.data.length) {   // conflicto (otro dispositivo guardó antes) o sin conexión
-    if (r.error && !/duplicate|conflict/i.test(r.error.message)) { dirty = true; setStatus('Sin conexión: los cambios se guardan en este dispositivo', 'off'); return; }   // quedan pendientes: no se pisan con la copia de la nube
-    await pull(); setStatus('Se actualizó desde otro dispositivo: repite el último cambio si no aparece', 'off'); return;
+  if (r.error || !r.data || !r.data.length) {
+    if (!r.error || classify(r.error) === 'conflict') { await conflict(); return; }   // otro dispositivo guardó antes
+    dirty = true; markPending();          // quedan pendientes: no se pisan con la copia de la nube
+    if (await onFail(r.error, retried)) return push(true);
+    return;
   }
   rev = r.data[0].rev; saveRev(); setStatus('Sincronizado', 'ok');
-  if (dirty) schedulePush();
+  if (dirty) schedulePush(); else clearPending();
 }
 async function initCloud() {
   if (!CFG || !window.supabase) { ready = true; checkNewMonth(); return; }
   sb = window.supabase.createClient(CFG.url, CFG.key, { auth: { persistSession: true, autoRefreshToken: true } });
   session = (await sb.auth.getSession()).data.session;
   const hadSession = !!session;
-  sb.auth.onAuthStateChange((_e, s) => { session = s; });
+  // sesión que se pierde sin que el usuario cierre sesión (caducada, revocada, contraseña cambiada en otro sitio)
+  sb.auth.onAuthStateChange((ev, s) => { session = s; if (ev === 'SIGNED_OUT' && !loggingOut) sessionExpired(); });
   if (!session) { identifying = false; await askLogin(); }   // con el formulario abierto el estado sigue vacío: no se muestra nada de nadie
   identifying = false;
   claimLocal(hadSession);
-  await pull();
-  ready = true; render(); checkNewMonth();
+  if (hasPending()) await push(); else await pull();   // cambios hechos sin internet: primero se suben
+  ready = true; render(); checkNewMonth(); offerBackup();
 }
 document.addEventListener('visibilitychange', () => {
   if (!sb || !session) return;
-  if (document.hidden) { if (dirty) push(); }
-  else if (dirty && !pushing) push();                       // hay cambios sin subir: primero se suben
+  if (document.hidden) { if (hasPending()) push(); }
+  else if (hasPending()) { if (!pushing) push(); }          // hay cambios sin subir: primero se suben
   else if (!pushing && !document.querySelector('dialog[open]')) pull();
 });
 $('pw-eye').onclick = () => { const p = $('pw-new'), show = p.type === 'password'; p.type = show ? 'text' : 'password'; $('pw-eye').textContent = show ? 'Ocultar' : 'Ver'; };
@@ -1005,10 +1076,10 @@ $('logout').onclick = async () => {
   if (!sb) return;
   // primero se intentan subir los cambios pendientes; si no se puede (sin conexión), se avisa de que se perderían
   for (let i = 0; i < 100 && pushing; i++) await new Promise(r => setTimeout(r, 100));
-  if (dirty) await push();
-  const pend = dirty || pushing;
+  if (hasPending()) await push();
+  const pend = hasPending() || pushing || hasBackup();
   if (!confirm(pend ? 'Hay cambios sin subir a la nube (por ejemplo, hechos sin internet). Si cierras sesión ahora se perderán en este dispositivo. ¿Cerrar sesión igualmente?' : '¿Cerrar sesión en este dispositivo?')) return;
-  clearTimeout(pushTimer); dirty = false;
+  clearTimeout(pushTimer); dirty = false; loggingOut = true;   // cierre voluntario: no es «sesión caducada»
   await sb.auth.signOut(); wipeLocal(); location.reload();
 };
 
@@ -1027,7 +1098,7 @@ async function probeNet() {
 }
 function resync() {            // de vuelta con internet: sube lo pendiente o trae lo último de la nube
   if (!sb || !session || pushing) return;
-  if (dirty) push(); else if (!document.querySelector('dialog[open]')) pull();
+  if (hasPending()) push(); else if (!document.querySelector('dialog[open]')) pull();
 }
 function setNet(on) {
   const was = netOnline, first = !netKnown; netKnown = true; netOnline = on;
